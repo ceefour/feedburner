@@ -1,0 +1,17 @@
+<?php
+
+function feedburner_init() {
+	$path = db_escape_string($_GET['q']);
+	$feedburner_url = 'http://feeds.feedburner.com/davereid';
+	if ($path == 'rss.xml' && !preg_match("/feedburner|feedvalidator/i", $_SERVER['HTTP_USER_AGENT'])) {
+		drupal_goto($feedburner_url, NULL, NULL, 307);
+	} elseif ($path == 'node') {
+		/*$feed_url = url('rss.xml', NULL, NULL, TRUE);
+		drupal_add_feed($feedburner_url, variable_get('site_name', 'Drupal') .' '. t('RSS'));	
+		drupal_add_link(array(
+			'rel' => 'alernate',
+			'type' => 'application/rss+xml',
+			'title' => variable_get('site_name', 'Drupal') .' '. t('RSS'),
+			'href' => $feedburner_url));*/
+	}
+}
