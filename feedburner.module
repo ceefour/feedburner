@@ -1,17 +1,78 @@
 <?php
+/* $Id$ */
 
+/**
+ * @file
+ * Redirects main feed requests to a FeedBurner feed
+ */
+
+/**
+ * Implementation of hook_help()
+ */
+function feedburner_help() {
+   $output = '';
+   switch ($section) {
+      case "admin/help#feedburner":
+         $output = '<p>'. t("Redirects requests for your site's feed to a FeedBurner feed while still allowing FeedBurner to access the feed.") .'</p>';
+         break;
+   }
+   return $output;
+}
+
+/**
+ * Implementation of hook_menu($may_cache)
+ */
+function feedburner_menu($may_cache) {
+   $items = array();
+   if ($may_cache) {
+      $items[] = array(
+         'path' => 'admin/settings/feedburner',
+         'title' => t('FeedBurner'),
+         'callback' => 'drupal_get_form',
+         'callback arguments' => 'feedburner_admin_settings',
+         'type' => MENU_NORMAL_ITEM);
+      return $items;
+   }
+}
+
+/**
+ * Implementation of hook_init()
+ */
 function feedburner_init() {
-	$path = db_escape_string($_GET['q']);
-	$feedburner_url = 'http://feeds.feedburner.com/davereid';
-	if ($path == 'rss.xml' && !preg_match("/feedburner|feedvalidator/i", $_SERVER['HTTP_USER_AGENT'])) {
-		drupal_goto($feedburner_url, NULL, NULL, 307);
-	} elseif ($path == 'node') {
-		/*$feed_url = url('rss.xml', NULL, NULL, TRUE);
-		drupal_add_feed($feedburner_url, variable_get('site_name', 'Drupal') .' '. t('RSS'));	
-		drupal_add_link(array(
-			'rel' => 'alernate',
-			'type' => 'application/rss+xml',
-			'title' => variable_get('site_name', 'Drupal') .' '. t('RSS'),
-			'href' => $feedburner_url));*/
-	}
+   $path = db_escape_string($_GET['q']);
+   $feedburner_url = 'http://feeds.feedburner.com/'. variable_get('feedburner_url', '');
+   if (!empty($feedburner_url) && $path == 'rss.xml' && !preg_match("/feedburner|feedvalidator/i", $_SERVER['HTTP_USER_AGENT'])) {
+      drupal_goto($feedburner_url, null, null, variable_get('feedburner_redirect', 307));
+   } elseif ($path == 'node') {
+      // $feed_url = url('rss.xml', NULL, NULL, TRUE);
+      // drupal_add_feed($feedburner_url, variable_get('site_name', 'Drupal') .' '. t('RSS'));
+      // drupal_add_link(array(
+         // 'rel' => 'alernate',
+         // 'type' => 'application/rss+xml',
+         // 'title' => variable_get('site_name', 'Drupal') .' '. t('RSS'),
+         // 'href' => $feedburner_url));
+   }
+}
+
+/**
+ * Defines FeedBurner admin settings form
+ */
+function feedburner_admin_settings() {
+   $form['feedburner_url'] = array(
+      '#type' => 'textfield',
+      '#title' => t('FeedBurner Feed Name'),
+      '#default_value' => variable_get('feedburner_url', ''),
+      '#size' => 30,
+      '#maxlength' => 30,
+      '#description' => t('This is the last part of the FeedBurner url (http://feeds.feedburner.com/<em>feedname</em>)'));
+   $form['feedburner_redirect'] = array(
+      '#type' => 'select',
+      '#title' => t('Redirect Header Status'),
+      '#default_value' => variable_get('feedburner_redirect', 307),
+      '#options' => array(
+         301 => '301 Moved Permanently',
+         302 => '302 Found',
+         307 => '307 Temporary Redirect'),
+      '#description' => t('For detailed descriptions of HTTP redirect status codes, see <a href="http://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection">http://en.wikipedia.org/wiki/List_of_HTTP_status_codes</a>'));
+   return system_settings_form($form);
 }
