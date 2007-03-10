@@ -1,3 +1,4 @@
+; $Id$
 name = Feedburner redirection
 description = Redirects RSS views to a feedburner feed.
 package = Feed
