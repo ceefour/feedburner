@@ -79,7 +79,6 @@ function feedburner_menu($may_cache) {
   else {
     _feedburner_redirect();
   }
-
    return $items;
 }
 
@@ -117,7 +116,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
  * Allows the user to set FeedBurner redirection for his/her own blog's feed.
  */
 function feedburner_user($op, &$edit, &$account, $category = NULL) {
-  if (module_exists('blog') && user_access('edit own blog')) {
+  if (module_exists('blog') && user_access('edit own blog') && variable_get('feedburner_blogs', FALSE)) {
     global $user;
     $user_blog = 'blog/'. $user->uid .'/feed';
     if ($op == 'form' && $category == 'account') {
@@ -306,6 +305,12 @@ function feedburner_admin_settings() {
       307 => '307 Temporary Redirect'),
     '#description' => t('Note that FeedBurner recommends the use of the 307 Temporary Redirect in <a href="-link">this forum post</a>. For detailed descriptions of HTTP redirect status codes, see <a href="http://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection">http://en.wikipedia.org/wiki/List_of_HTTP_status_codes</a>.')
   );
+  $form['redirection']['feedburner_blogs'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Allow users to specify his/her own blog FeedBurner feed.'),
+    '#default_value' => variable_get('feedburner_blogs', FALSE),
+    '#description' => t('If enabled, this option can be found in the edit user screen. The permission \'edit own blog\' needs to be enabled for this feature.')
+  );
   $form['feedflare'] = array(
     '#type' => 'fieldset',
     '#title' => t('FeedFlare'),
@@ -363,6 +368,10 @@ function feedburner_admin_settings() {
   );*/
 
   return system_settings_form($form);
+}
+
+function feedburner_init() {
+
 }
 
 /**
@@ -485,6 +494,7 @@ function _feedburner_update_feed($feed, $feedburner = NULL) {
   if (!empty($feedburner)) {
     $feeds[$feed] = preg_replace('/[\\W]/', '', $feedburner);
     variable_set('feedburner_feeds', $feeds);
+    cache_clear_all();
   }
   else if (isset($feeds[$feed])) {
     unset($feeds[$feed]);
