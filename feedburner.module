@@ -79,7 +79,7 @@ function feedburner_menu($may_cache) {
   else {
     _feedburner_redirect();
   }
-   return $items;
+  return $items;
 }
 
 /**
@@ -153,8 +153,8 @@ function feedburner_user($op, &$edit, &$account, $category = NULL) {
   }
 }
 
-/*
- * Implementation of nodeapi() to insert FeedFlare JavaScript
+/**
+ * Implementation of nodeapi().
  */
 function feedburner_nodeapi(&$node, $op, $teaser, $page) {
   switch ($op) {
@@ -169,6 +169,21 @@ function feedburner_nodeapi(&$node, $op, $teaser, $page) {
       }
       break;
   }
+}
+
+/**
+ * Implementation of hook_exit().
+ *
+ * If FeedBurner or FeedValidator comes, Drupal caches the feed and the next
+ * a user visits the url, they are no longer directed to FeedBurner, but served
+ * the cached version.
+ */
+function feedburner_exit($destination = NULL) {
+  if ($destination == NULL && preg_match("/feedburner|feedvalidator/i", $_SERVER['HTTP_USER_AGENT'])) {
+    global $base_root;
+    cache_clear_all($base_root . request_uri(), 'cache_page');
+  }
+  return;
 }
 
 function feedburner_admin_build() {
@@ -370,10 +385,6 @@ function feedburner_admin_settings() {
   return system_settings_form($form);
 }
 
-function feedburner_init() {
-
-}
-
 /**
  * Determines if the current request needs to be redirected to a FeedBurner feed
  */
@@ -386,7 +397,6 @@ function _feedburner_redirect() {
 
   // Make sure we can load paths
   drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
-  //$path = db_escape_string($_GET['q']);
   $path = $_GET['q'];
   if (isset($feeds[$path])) {
     drupal_goto('http://feeds.feedburner.com/'. $feeds[$path], null, null, intval(variable_get('feedburner_redirect_status', 307)));
@@ -483,7 +493,7 @@ function _feedburner_get_feedflare($nid, $type, $block = FALSE) {
  * Checks the syntax of a FeedBurner feed
  */
 function _feedburner_is_valid_feed($feed) {
-  return !preg_match('/[\\W]/', $feed);
+  return !preg_match('/[^\\w\/\\-_]/', $feed);
 }
 
 /**
@@ -492,15 +502,23 @@ function _feedburner_is_valid_feed($feed) {
 function _feedburner_update_feed($feed, $feedburner = NULL) {
   $feeds = _feedburner_get_redirects();
   if (!empty($feedburner)) {
-    $feeds[$feed] = preg_replace('/[\\W]/', '', $feedburner);
-    variable_set('feedburner_feeds', $feeds);
-    cache_clear_all();
+    $feeds[$feed] = preg_replace('/[^\\w\/\\-_]/', '', $feedburner);
   }
   else if (isset($feeds[$feed])) {
     unset($feeds[$feed]);
     /*if ($feed['url'] == 'rss.xml') {
       variable_set('feedburner_feedflare', FALSE);
     }*/
-    variable_set('feedburner_feeds', $feeds);
+  }
+  variable_set('feedburner_feeds', $feeds);
+
+  // Need to clear the cache for the feed page since
+  global $base_url;
+  cache_clear_all($base_url .'/'. $feed, 'cache_page');
+  if (variable_get('clean_url', '0') == TRUE) {
+    $alias = drupal_get_path_alias($feed);
+    if ($alias != $feed) {
+      cache_clear_all($base_url .'/'. $alias, 'cache_page');
+    }
   }
 }
