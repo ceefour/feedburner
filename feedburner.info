@@ -1,4 +1,4 @@
-; $Id $
+; $Id$
 name = Feedburner
 description = "Integrates with FeedBurner services, primarily feed redirection."
 package = Syndication
