@@ -6,6 +6,8 @@
  * Redirects main feed requests to a FeedBurner feed
  */
 
+define("FEEDBURNER_DEFAULT_USERAGENTS", "feedburner|feedvalidator");
+
 /**
  * Implementation of hook_help()
  */
@@ -22,8 +24,9 @@ function feedburner_help($section) {
       $settings_link = l('FeedBurner options', 'admin/settings/feedburner');
       return '<p>'. t("This is help for the FeedBurner site building page. Make sure to check out the $settings_link.") .'</p>';
       break;
+    case 'admin/build/feedburner/add':
     case 'admin/build/feedburner/edit':
-      return '<p>'. t('Be sure to check that you\'ve already created the FeedBurner feed. Future plans for this module include the ability to automatically create new feeds with FeedBurner\'s Feed Management API.') .'</p>';
+      return '<p>'. t('Be sure to check that you\'ve already created the FeedBurner feed. Future plans for this module possibly include the ability to automatically create new feeds with FeedBurner\'s Feed Management API.') .'</p>';
       break;
   }
 }
@@ -42,42 +45,49 @@ function feedburner_menu($may_cache) {
       'callback' => 'drupal_get_form',
       'callback arguments' => array('feedburner_admin_settings'),
       'access' => user_access('administer site configuration'),
-      'type' => MENU_NORMAL_ITEM);
+      'type' => MENU_NORMAL_ITEM
+    );
     $items[] = array(
       'path' => 'admin/build/feedburner',
       'title' => t('FeedBurner'),
       'description' => t('Change FeedBurner redirection'),
       'callback' => 'feedburner_admin_build',
-      'access' => user_access('administer FeedBurner'));
+      'access' => user_access('administer FeedBurner')
+    );
     $items[] = array(
       'path' => 'admin/build/feedburner/edit',
       'title' => t('Edit feed redirection'),
       'callback' => 'drupal_get_form',
       'callback arguments' => array('feedburner_admin_build_edit'),
       'access' => user_access('administer FeedBurner'),
-      'type' => MENU_CALLBACK);
+      'type' => MENU_CALLBACK
+    );
     $items[] = array(
       'path' => 'admin/build/feedburner/remove',
       'title' => t('Delete feed redirection'),
-      'callback' => 'drupal_get_form',
-      'callback arguments' => array('feedburner_admin_build_remove_confirm'),
+      //'callback' => 'drupal_get_form',
+      //'callback arguments' => array('feedburner_admin_build_remove'),
+      'callback' => 'feedburner_admin_build_remove',
       'access' => user_access('administer FeedBurner'),
-      'type' => MENU_CALLBACK);
-    /*$items[] = array(
+      'type' => MENU_CALLBACK
+    );
+    $items[] = array(
       'path' => 'admin/build/feedburner/list',
       'title' => t('List'),
       'type' => MENU_DEFAULT_LOCAL_TASK,
-      'weight' => -10);*/
-    /*$items[] = array(
+      'weight' => -10
+    );
+    $items[] = array(
       'path' => 'admin/build/feedburner/add',
       'title' => t('Add feed redirection'),
       'callback' => 'drupal_get_form',
       'callback arguments' => array('feedburner_admin_build_edit'),
       'access' => user_access('administer FeedBurner'),
-      'type' => MENU_LOCAL_TASK);*/
+      'type' => MENU_LOCAL_TASK
+    );
   }
   else {
-    _feedburner_redirect();
+    _feedburner_do_redirect();
   }
   return $items;
 }
@@ -95,20 +105,68 @@ function feedburner_perm() {
 function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
   if ($op == 'list') {
     $blocks[0]['info'] = t('FeedBurner FeedFlare');
+    //$blocks[1]['info'] = t('FeedBurner Stats');
     return $blocks;
   }
   else if ($op == 'view') {
-    if (arg(0) == 'node' && is_numeric(arg(1))) {
+    if ($delta == 0 && arg(0) == 'node' && is_numeric(arg(1))) {
       $node = node_load(arg(1));
-      $feedflare = _feedburner_get_feedflare($node->nid, $node->type, TRUE);
+      $feedflare = _feedburner_get_feedflare($node->nid, $node->type, $node->path, TRUE);
       if ($feedflare != FALSE) {
         $block['subject'] = t('FeedFlare');
         $block['content'] = $feedflare;
       }
     }
+    /*else if ($delta == 1) {
+      $block['subject'] = t('FeedBurner Stats');
+      $block['content'] = t('This is where I would put the FeedBurner Awareness API stats.');
+    }*/
     return $block;
   }
 }
+
+/**
+ * Implementation of hook_cron().
+ */
+/*function feedburner_cron() {
+  _feedburner_check_feedmedic();
+}
+
+function _feedburner_check_feedmedic() {
+  $cron_last = variable_get('cron_last');
+  include_once((drupal_get_path('module', 'feedburner'). '/xml.php.inc'));
+  $fb_username = variable_get('feedburner_username', NULL);
+  if (empty($fb_username)) {
+    return FALSE;
+  }
+  $request = drupal_http_request('http://feeds.feedburner.com/~u/'. $fb_username);
+  if ($request->code != 200) {
+    return FALSE;
+  }
+  $fb_feedmedic = XML_unserialize($request->data);
+  $fb_feedmedic = $fb_feedmedic['rss']['channel'];
+  $feeds = _feedburner_get_redirects();
+  foreach($data['item'] as $item) {
+    if (strtotime($item['pubDate']) > $cron_last) {
+      foreach($feeds as $feed_uri => $feed_feedburner) {
+        if (strpos($item['title'], 'http://feeds.feedburner.com/'. $feed_feedburner)) {
+          //$watchdog = $item['title'] .'<br />'. strip_tags(preg_replace('/(?:<br \/>){2,}/i', '', preg_replace('/<p>|\n|\r/i', '<br />', $item['description'])), '<a><br>');
+          //$watchdog = $item['title'] .'<br />'. strip_tags(preg_replace('/<p>|\n|\r/i', '<br />', $item['description']), '<a><br>');
+          $watchdog = $item['title'] .'<br />'. strip_tags(preg_replace('/(?:<br \/>|<p>|\\n|\\r){1,}/i', '<br />', $item['content:encoded']), '<a><br>');
+          $severity = (strpos($item['title'], 'PROBLEM') !== FALSE ? WATCHDOG_WARNING : WATCHDOG_NOTICE);
+          //echo "<pre>". htmlspecialchars($watchdog) ."</pre>";
+          watchdog('feedburner', $watchdog, $severity, 'http://www.feedburner.com/fb/a/myfeeds');
+        }
+      }
+    }
+    else {
+      return;
+    }
+  }
+  $data = $data['rss']['channel'];
+  $build_date = $data['lastBuildDate'];
+  return $build_date;
+}*/
 
 /**
  * Implementation of hook_user().
@@ -117,8 +175,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
  */
 function feedburner_user($op, &$edit, &$account, $category = NULL) {
   if (module_exists('blog') && user_access('edit own blog') && variable_get('feedburner_blogs', FALSE)) {
-    global $user;
-    $user_blog = 'blog/'. $user->uid .'/feed';
+    $user_blog = 'blog/'. $account->uid .'/feed';
     if ($op == 'form' && $category == 'account') {
       $feeds = _feedburner_get_redirects();
       $form['feedburner'] = array(
@@ -126,26 +183,31 @@ function feedburner_user($op, &$edit, &$account, $category = NULL) {
         '#title' => t('Blog FeedBurner Redirection'),
         '#weight' => 1,
         '#collapsible' => TRUE,
-        '#description' => t('Requests for your blog\'s feed ('. url($user_blog, NULL, NULL, TRUE) .') will be redirected to this FeedBurner feed. Leave this blank to disable redirection.'),
+        '#description' => t('Requests for your blog\'s feed (%url) will be redirected to this FeedBurner feed. Leave this blank to disable redirection.', array('%url' => url($user_blog, NULL, NULL, TRUE))),
       );
-      $form['feedburner']['feedburner_url'] = array(
+      $form['feedburner']['feedburner_uri'] = array(
         '#type' => 'textfield',
         //'#title' => t('FeedBurner URL'),
         '#maxlength' => 100,
         '#size' => 30,
         '#default_value' => $feeds[$user_blog],
         '#field_prefix' => 'http://feeds.feedburner.com/',
-        '#description' => t('This URL is case-sensitive and alphanumeric.')
+        '#description' => t('This URI is case-sensitive and alphanumeric.')
       );
       return $form;
     }
     elseif ($op == 'validate') {
-      if (!_feedburner_is_valid_feed($edit['feedburner_url'])) {
-        form_set_error('feedburner_url', t('Invalid FeedBurner feed name (alphanumeric only, no spaces or special characters).'));
-      }
+      $edit['feed_uri'] = $user_blog;
+      feedburner_admin_build_edit_validate(NULL, $edit);
+      unset($edit['feed_uri']);
     }
     elseif ($op == 'update') {
-      _feedburner_update_feed($user_blog, $edit['feedburner_url']);
+      if ($edit['status'] == 0) {
+        _feedburner_update_feed($user_blog);
+      } else {
+        _feedburner_update_feed($user_blog, $edit['feedburner_uri']);
+        unset($edit['feedburner_uri']);
+      }
     }
     elseif ($op == 'delete') {
       _feedburner_update_feed($user_blog);
@@ -157,29 +219,31 @@ function feedburner_user($op, &$edit, &$account, $category = NULL) {
  * Implementation of nodeapi().
  */
 function feedburner_nodeapi(&$node, $op, $teaser, $page) {
-  switch ($op) {
-    case 'view':
-      $feedflare = _feedburner_get_feedflare($node->nid, $node->type);
-      $display = variable_get('feedburner_feedflare', 0);
-      if ($feedflare != FALSE && ($display == 3 || ($display == 1 && $teaser) || ($display == 2 && $page))) {
+  if ($op == 'view') {
+    $display = variable_get('feedburner_feedflare', 0);
+    if ($display == 3 || ($display == 1 && $teaser) || ($display == 2 && $page)) {
+      $feedflare = _feedburner_get_feedflare($node->nid, $node->type, $node->path);
+      if ($feedflare != FALSE) {
         $node->content['feedflare'] = array(
           '#value' => $feedflare,
           '#weight' => 10,
         );
       }
-      break;
+    }
   }
 }
 
 /**
  * Implementation of hook_exit().
  *
- * If FeedBurner or FeedValidator comes, Drupal caches the feed and the next
- * a user visits the url, they are no longer directed to FeedBurner, but served
- * the cached version.
+ * Don't let requests by FeedBurner or Feed Validator be cached by the Drupal
+ * system. If feeds are cached, regular users then may be served the cached
+ * version of instead of being properly redirected.
  */
 function feedburner_exit($destination = NULL) {
-  if ($destination == NULL && preg_match("/feedburner|feedvalidator/i", $_SERVER['HTTP_USER_AGENT'])) {
+  $useragent = $_SERVER['HTTP_USER_AGENT'];
+  $useragents = '/'. variable_get('feedburner_useragents', FEEDBURNER_DEFAULT_USERAGENTS)  .'/i';
+  if (isset($_GET['no_feed_redirect']) || preg_match($useragents, $useragent)) {
     global $base_root;
     cache_clear_all($base_root . request_uri(), 'cache_page');
   }
@@ -189,38 +253,39 @@ function feedburner_exit($destination = NULL) {
 function feedburner_admin_build() {
   $feeds = _feedburner_get_feeds();
 
-  //if (empty($_GET['order']) || $_GET['order'] == 'Feed') {
+  /*if (empty($_GET['order']) || $_GET['order'] == 'Feed URI') {
     if ($_GET['sort'] == 'desc') {
       krsort($feeds);
     }
     else {
       ksort($feeds);
     }
-  //}
-  //else {
-  //  uasort($feeds, create_function('$a,$b', '$field = strtolower($_GET["order"]); $result = strcmp($a[$field], $b[$field]); return ($_GET["sort"] == "desc" ? -$result : $result);'));
-  //}
+  }
+  else {
+    uasort($feeds, create_function('$a,$b', '$field = strtolower($_GET["order"]); $result = strcmp($a[$field], $b[$field]); return ($_GET["sort"] == "desc" ? -$result : $result);'));
+  }*/
+  ksort($feeds);
 
   $header = array(
-    array('data' => t('Feed'), 'field' => 'url'),
+    array('data' => t('Feed URI'), /*'field' => 'uri'*/),
     array('data' => t('Name'), /*'field' => 'title'*/),
-    array('data' => t('FeedBurner'), /*'field' => 'feedburner'*/),
+    array('data' => t('FeedBurner URI'), /*'field' => 'feedburner'*/),
     array('data' => t('Redirect Operations'), 'colspan' => '2')
   );
 
-  $destination = drupal_get_destination();
-  foreach ($feeds as $feed_url => $feed_values) {
+  //$destination = drupal_get_destination();
+  foreach ($feeds as $feed_uri => $feed_values) {
     $row = array(
-      check_plain($feed_url),
+      check_plain($feed_uri),
       check_plain($feed_values['name']));
-    if (empty($feed_values['feedburner'])) {
+    if (empty($feed_values['feedburner_uri'])) {
       $row[] = '<em>None</em>';
-      $row[] = array('data' => l(t('add'), 'admin/build/feedburner/edit', array(), 'feed='. $feed_url .'&'. $destination), 'colspan' => '2');
+      $row[] = array('data' => l(t('add'), 'admin/build/feedburner/edit', array(), 'feed_uri='. $feed_uri /*.'&'. $destination*/), 'colspan' => '2');
     }
     else {
-      $row[] = l($feed_values['feedburner'], 'http://feeds.feedburner.com/'. $feed_values['feedburner']);
-      $row[] = l(t('edit'), 'admin/build/feedburner/edit', array(), 'feed='. $feed_url .'&'. $destination);
-      $row[] = l(t('remove'), 'admin/build/feedburner/remove', array(), 'feed='. $feed_url .'&'. $destination);
+      $row[] = l($feed_values['feedburner_uri'], 'http://feeds.feedburner.com/'. $feed_values['feedburner_uri']);
+      $row[] = l(t('edit'), 'admin/build/feedburner/edit', array(), 'feed_uri='. $feed_uri /*.'&'. $destination*/);
+      $row[] = l(t('remove'), 'admin/build/feedburner/remove', array(), 'feed_uri='. $feed_uri /*.'&'. $destination*/);
     }
     $rows[] = $row;
   }
@@ -230,77 +295,134 @@ function feedburner_admin_build() {
   }*/
 
   $output = theme('table', $header, $rows);
+
+  //TODO: Split feed listings into two categories: regular and blog feeds
+  /*$output .= '<div><h2>Blog Feeds</h2></div>';
+  $blog_feeds = _feedburner_get_blog_feeds();
+  $header = array(
+    array('data' => t('Blog Feed URI')),
+    array('data' => t('Name')),
+    array('data' => t('FeedBurner URI')),
+    array('data' => t('Redirect Operations'), 'colspan' => '2')
+  );
+  $rows = array();
+  foreach ($blog_feeds as $feed_uri => $feed_values) {
+    $row = array(
+      check_plain($feed_uri),
+      check_plain($feed_values['name']));
+    if (empty($feed_values['feedburner_uri'])) {
+      $row[] = '<em>None</em>';
+      $row[] = array('data' => l(t('add'), 'admin/build/feedburner/edit', array(), 'feed_uri='. $feed_uri), 'colspan' => '2');
+    }
+    else {
+      $row[] = l($feed_values['feedburner_uri'], 'http://feeds.feedburner.com/'. $feed_values['feedburner_uri']);
+      $row[] = l(t('edit'), 'admin/build/feedburner/edit', array(), 'feed_uri='. $feed_uri);
+      $row[] = l(t('remove'), 'admin/build/feedburner/remove', array(), 'feed_uri='. $feed_uri);
+    }
+    $rows[] = $row;
+  }
+  $output .= theme('table', $header, $rows);*/
+
   return $output;
 }
 
 function feedburner_admin_build_edit() {
-  $feeds = _feedburner_get_feeds();
-  $feed_url = check_plain($_GET['feed']);
-  drupal_set_title('Edit FeedBurner for '. $feed_url);
-  if (empty($feed_url) || !isset($feeds[$feed_url])) {
-    drupal_set_message('The feed URL was not found.', 'error');
-    return;
+  $feed_uri = check_plain($_GET['feed_uri']);
+  $feedburner_uri = '';
+  $add = empty($feed_uri) && !isset($feeds[$feed_uri]);
+
+  if ($add) {
+    drupal_set_title('Add FeedBurner Redirect');
+  } else {
+    drupal_set_title('Edit FeedBurner Redirect');
+    $feeds = _feedburner_get_feeds();
+    $feedburner_uri = $feeds[$feed_uri]['feedburner_uri'];
   }
-  else {
-    $form['url'] = array(
-      '#type' => 'textfield',
-      '#title' => t('Feed url'),
-      '#default_value' => $feed_url,
-      '#size' => 30,
-      '#disabled' => TRUE,
-      '#description' => t('The existing feed on your site.'),
-      '#field_prefix' => url(NULL, NULL, NULL, TRUE));
-    $form['feedburner'] = array(
-      '#type' => 'textfield',
-      '#title' => 'FeedBurner feed name',
-      '#default_value' => $feeds[$feed_url]['feedburner'],
-      '#maxlength' => 100,
-      '#size' => 30,
-      '#description' => t('Requests to the above feed will be requested to this FeedBurner feed. This URL is case-sensitive and alphanumeric.'),
-      '#field_prefix' => 'http://feeds.feedburner.com/');
-    return system_settings_form($form);
-  }
+
+  $form['feed_uri'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Local Feed URI'),
+    '#default_value' => $feed_uri,
+    '#size' => 30,
+    '#disabled' => !$add,
+    '#description' => t('The existing feed on your site.'),
+    '#field_prefix' => url(NULL, NULL, NULL, TRUE));
+  $form['feedburner_uri'] = array(
+    '#type' => 'textfield',
+    '#title' => t('FeedBurner Feed URI'),
+    '#default_value' => $feedburner_uri,
+    '#maxlength' => 100,
+    '#size' => 30,
+    '#description' => t('Requests to the above feed will be requested to this FeedBurner feed. This URI is case-sensitive and alphanumeric.'),
+    '#field_prefix' => 'http://feeds.feedburner.com/');
+  /*$form['add'] = array(
+    '#type' => 'hidden',
+    '#value' => $add
+  );*/
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => ($add ? t('Create redirection') : t('Update redirection'))
+  );
+
+  return $form;
 }
 
 function feedburner_admin_build_edit_validate($form_id, $form_values) {
-  $feedburner = $form_values['feedburner'];
-  if (empty($feedburner)) {
-    form_set_error('feedburner', t('FeedBurner feed name cannot be blank.'));
+  $feed_uri = $form_values['feed_uri'];
+  $feedburner_uri = $form_values['feedburner_uri'];
+  $feeds = _feedburner_get_redirects();
+  if (!_feedburner_is_valid_feed(url($feed_uri, 'no_feed_redirect', NULL, TRUE))) {
+    form_set_error('feed_uri', t('The specified local feed URI does not exist.'));
   }
-  else if (!_feedburner_is_valid_feed($edit['feedburner_url'])) {
-    form_set_error('feedburner', t('Invalid FeedBurner feed name (alphanumeric only, no spaces or special characters).'));
+  else if (!_feedburner_is_valid_feed_name($feedburner_uri)) {
+    form_set_error('feedburner_uri', t('Invalid FeedBurner feed URI (alphanumeric only, no spaces or special characters).'));
+  }
+  else if (!_feedburner_is_valid_feed('http://feeds.feedburner.com/'. $feedburner_uri)) {
+    form_set_error('feedburner_uri', t('It looks like you haven\'t created the feed %feedburner_uri at FeedBurner yet. You can do so by following !url.', array('%feedburner_uri' => $feedburner_uri, '!url' => l('this link', 'https://www.feedburner.com/fb/a/addfeed', NULL, 'sourceUrl='. url($feed_uri, NULL, NULL, TRUE) .'&mappedUri='. $feedburner_uri))), 'error');
   }
 }
 
 function feedburner_admin_build_edit_submit($form_id, $form_values) {
-  _feedburner_update_feed($form_values['url'], $form_values['feedburner']);
-  drupal_set_message(t('The FeedBurner redirect has been saved.'));
+  $feed_uri = $form_values['feed_uri'];
+  $feedburner_uri = $form_values['feedburner_uri'];
+  if (_feedburner_update_feed($feed_uri, $feedburner_uri) == TRUE) {
+    drupal_set_message(t('The FeedBurner redirect has been saved.'));
+  }
   return 'admin/build/feedburner';
 }
 
-function feedburner_admin_build_remove_confirm() {
+function feedburner_admin_build_remove() {
+  if (_feedburner_update_feed($_GET['feed_uri']) == TRUE) {
+    drupal_set_message(t('The FeedBurner redirection has been removed.'));
+  }
+  drupal_goto('admin/build/feedburner');
+}
+
+/*function feedburner_admin_build_remove() {
   if (user_access('administer FeedBurner')) {
-    $form['url'] = array(
+    $form['feed_uri'] = array(
       '#type' => 'value',
-      '#value' => $_GET['feed']);
+      '#value' => $_GET['feed_uri']
+    );
     $output = confirm_form(
         $form,
-        t('Are you sure you want to delete FeedBurner redirection for %url?', array('%url' => $_GET['feed'])),
+        t('Are you sure you want to delete FeedBurner redirection for %url?', array('%url' => $_GET['feed_uri'])),
         $_GET['destination'] ? $_GET['destination'] : 'admin/build/feedburner',
-        t('This action cannot be undone, but you can always re-add the redirect.'),
+        t('This action cannot be undone, but you can always re-add it at anytime.'),
         t('Delete'),
-        t('Cancel'));
+        t('Cancel')
+    );
   }
   return $output;
 }
 
-function feedburner_admin_build_remove_confirm_submit($form_id, $form_values) {
+function feedburner_admin_build_remove_submit($form_id, $form_values) {
   if ($form_values['confirm']) {
-    _feedburner_update_feed($form_values['url']);
+    _feedburner_update_feed($form_values['feed_uri']);
     drupal_set_message(t('The FeedBurner redirection has been removed.'));
     return 'admin/build/feedburner';
   }
-}
+}*/
 
 /**
  * Defines FeedBurner admin settings form
@@ -328,20 +450,20 @@ function feedburner_admin_settings() {
   );
   $form['feedflare'] = array(
     '#type' => 'fieldset',
-    '#title' => t('FeedFlare'),
-    '#description' => t('FeedFlare is only enabled when you have a FeedBurner feed for your site\'s main feed (rss.xml). See <a href="http://www.feedburner.com/fb/a/publishers/feedflare">http://www.feedburner.com/fb/a/publishers/feedflare</a> for more information.'),
+    '#title' => t('FeedFlare/Standard Stats/Ad Network'),
+    '#description' => t('See <a href="http://www.feedburner.com/fb/a/publishers/feedflare">http://www.feedburner.com/fb/a/publishers/feedflare</a> for more information.'),
     '#collapsible' => FALSE
   );
-  /*$form['feedflare']['feedburner_feedflare'] = array(
-    '#type' => 'checkbox',
-    '#default_value' => variable_get('feedburner_feedflare', FALSE),
-    '#disabled' => !array_key_exists('rss.xml', _feedburner_get_redirects()),
-    '#description' => t('FeedFlare is only enabled when you have a FeedBurner feed for your site\'s main feed (rss.xml). See <a href="http://www.feedburner.com/fb/a/publishers/feedflare">http://www.feedburner.com/fb/a/publishers/feedflare</a> for more information.'),
-    '#title' => t('Enable FeedFlare inline with posts')
-  );*/
+  if (!array_key_exists('rss2.xml', _feedburner_get_redirects())) {
+    $form['feedflare']['notice'] = array(
+      '#value' => '<p><strong>FeedFlare is only enabled when you have a FeedBurner feed for your site\'s main feed (rss.xml).</strong></p>',
+    );
+  }
   $form['feedflare']['feedburner_feedflare_node_types'] = array(
-    '#type' => 'checkboxes',
+    //'#type' => 'checkboxes',
+    '#type' => 'select',
     '#title' => t('Node types'),
+    '#multiple' => TRUE,
     '#default_value' => variable_get('feedburner_feedflare_node_types', array()),
     '#options' => node_get_types('names')
   );
@@ -369,29 +491,56 @@ function feedburner_admin_settings() {
     '#type' => 'textfield',
     '#title' => t('Your FeedBurner username'),
     '#default_value' => variable_get('feedburner_username', ''),
-    '#disabled' => TRUE,
     '#size' => 30,
     '#maxlength' => 30
-  );
-  $form['account']['feedburner_password'] = array(
+  );*/
+  /*$form['account']['feedburner_password'] = array(
     '#type' => 'password',
     '#title' => t('Your FeedBurner account password'),
     '#default_value' => variable_get('feedburner_password', ''),
-    '#disabled' => TRUE,
     '#size' => 30,
     '#maxlength' => 30
   );*/
 
+  $form['advanced'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Advanced Settings'),
+    '#collapsible' => TRUE,
+    '#collapsed' => TRUE
+  );
+  $form['advanced']['feedburner_useragents'] = array(
+    '#type' => 'textarea',
+    '#title' => t('Allowed User Agents'),
+    '#description' => t('Enter a list of user agents (one per line) that are allowed direct access to your site\'s Feeds and will not be redirected to the FeedBurner feeds.'),
+    '#default_value' => preg_replace('/\\|/', "\n", variable_get('feedburner_useragents', FEEDBURNER_DEFAULT_USERAGENTS)),
+    '#rows' => 3,
+  );
+
   return system_settings_form($form);
 }
 
+function feedburner_admin_settings_validate($form_id, $form_values, $form) {
+  // Correct and format useragents
+  $useragents = $form_values['feedburner_useragents'];
+  $useragents = preg_replace('/(\\r?\\n)+/', '|', $useragents);
+  form_set_value($form['advanced']['feedburner_useragents'], $useragents);
+}
+
+/*function feedburner_admin_settings_submit($form_id, &$form_values) {
+  $form_values['feedburner_encrypted'] = base64_encode($form_values['feedburner_user'] .':'. $form_values['feedburner_pass']);
+  unset($form_values['feedburner_pass'];
+}*/
+
 /**
- * Determines if the current request needs to be redirected to a FeedBurner feed
+ * Redirects the current request to an appropriate FeedBurner feed if the user
+ * agent doesn't match those specified by the user to be able to access the
+ * direct feeds.
  */
-function _feedburner_redirect() {
-  // Don't redirect if the user agent is FeedBurner or the Feed Validator
+function _feedburner_do_redirect() {
   $feeds = _feedburner_get_redirects();
-  if (preg_match("/feedburner|feedvalidator/i", $_SERVER['HTTP_USER_AGENT']) || empty($feeds)) {
+  $useragent = $_SERVER['HTTP_USER_AGENT'];
+  $useragents = '/'. variable_get('feedburner_useragents', FEEDBURNER_DEFAULT_USERAGENTS) .'/i';
+  if (empty($feeds) || empty($useragent) || preg_match($useragents, $useragent) || isset($_GET['no_feed_redirect'])) {
     return;
   }
 
@@ -401,15 +550,6 @@ function _feedburner_redirect() {
   if (isset($feeds[$path])) {
     drupal_goto('http://feeds.feedburner.com/'. $feeds[$path], null, null, intval(variable_get('feedburner_redirect_status', 307)));
   }
-
-  // Possibly add <link> tags to feedburner feeds on regular pages?
-  /*$feed_url = url('rss.xml', NULL, NULL, TRUE);
-  drupal_add_feed($feedburner_url, variable_get('site_name', 'Drupal') .' '. t('RSS'));
-  //drupal_add_link(array(
-  //   'rel' => 'alernate',
-  //   'type' => 'application/rss+xml',
-  //   'title' => variable_get('site_name', 'Drupal') .' '. t('RSS'),
-  //   'href' => $feedburner_url));*/
 }
 
 /**
@@ -422,7 +562,7 @@ function _feedburner_get_redirects() {
 /**
  * Returns an array of all of the feeds available on the site including user blogs
  */
-function _feedburner_get_feeds($user_access = FALSE) {
+function _feedburner_get_feeds() {
   $feeds = array();
   $feeds['rss.xml'] = array('name' => 'Main RSS');
 
@@ -449,16 +589,13 @@ function _feedburner_get_feeds($user_access = FALSE) {
     $feeds['blog/feed'] = array('name' => 'Blogs RSS');
     // Get each user's blog feed as well
     $result = db_query('SELECT u.uid, u.name FROM {users} u WHERE u.status = 1');
-    global $user;
     while ($user_details = db_fetch_array($result)) {
-      if (user_access('administer FeedBurner') || $user_details['uid'] == $user->uid) {
-        $feeds['blog/'. $user_details['uid'] .'/feed'] = array('name' => $user_details['name'] .'\'s Blog');
-      }
+      $feeds['blog/'. $user_details['uid'] .'/feed'] = array('name' => $user_details['name'] .'\'s Blog');
     }
   }
 
   // Change each url into it's path alias?
-  /*foreach ($feeds as $name => &$url) {
+  /*foreach ($feeds as $name => &$url)
     //$url = drupal_get_path_alias($url);
     $url = drupal_get_normal_path($url);
   }*/
@@ -466,53 +603,102 @@ function _feedburner_get_feeds($user_access = FALSE) {
   // Merge current redirects into feed array
   $redirects = _feedburner_get_redirects();
   foreach ($redirects as $k => $v) {
-    $feeds[$k]['feedburner'] = $v;
+    $feeds[$k]['feedburner_uri'] = $v;
   }
 
   return $feeds;
 }
 
+/*function _feedburner_get_blog_feeds() {
+  $feeds = array();
+  if (module_exists('blog')) {
+    $feeds['blog/feed'] = array('name' => 'Blogs RSS');
+    $result = db_query('SELECT u.uid, u.name FROM {users} u WHERE u.status = 1');
+    while ($user_details = db_fetch_array($result)) {
+      $feeds['blog/'. $user_details['uid'] .'/feed'] = array('name' => $user_details['name'] .'\'s Blog');
+    }
+  }
+
+  // Merge current redirects into feed array
+  $redirects = _feedburner_get_redirects();
+  foreach ($redirects as $k => $v) {
+    if (isset($feeds[$k])) {
+      $feeds[$k]['feedburner_uri'] = $v;
+
+    }
+  }
+
+  return $feeds;
+}*/
+
 /**
  * Get the JavaScript code for FeedFlare
  */
-function _feedburner_get_feedflare($nid, $type, $block = FALSE) {
-  $feeds = _feedburner_get_redirects();
-  $node_types = variable_get('feedburner_feedflare_node_types', array());
-  $display = variable_get('feedburner_feedflare', FALSE);
-  if (user_access('view FeedFlare') && ($block || $display) && isset($feeds['rss.xml']) && isset($node_types[$type]) && $node_types[$type] == TRUE) {
-    $feedflare_url = 'http://feeds.feedburner.com/'. $feeds['rss.xml'] .'?flareitem='. url('node/'. $nid, NULL, NULL, TRUE);
-    //$feedflare_url = 'http://feeds.feedburner.com/~s/'. feed['rss.xml'] .'?i='. url('node/'. $nid, NULL, NULL, TRUE);
-    return '<script src="'. $feedflare_url .'" type="text/javascript" charset="utf-8"></script>';
+function _feedburner_get_feedflare($nid, $type, $path = NULL) {
+  $feedflare = FALSE;
+  if (user_access('view FeedFlare')) {
+    $feeds = _feedburner_get_redirects();
+    $node_types = variable_get('feedburner_feedflare_node_types', array());
+    if (isset($feeds['rss.xml']) && isset($node_types[$type])) {
+      global $base_url;
+      $node_url = $base_url .'/'. (empty($path) ? 'node/'. $nid : $path);
+      $feedflare = '<script src="http://feeds.feedburner.com/'. $feeds['rss.xml'];
+      $feedflare .= '?flareitem='. url('node/'. $nid, NULL, NULL, TRUE);
+      $feedflare .= '" type="text/javascript" charset="utf-8"></script>';
+    }
   }
-  else {
-    return FALSE;
-  }
+  return $feedflare;
 }
 
 /**
- * Checks the syntax of a FeedBurner feed
+ * Checks to see if a FeedBurner feed exists by trying to fetch the url.
  */
-function _feedburner_is_valid_feed($feed) {
-  return !preg_match('/[^\\w\/\\-_]/', $feed);
+function _feedburner_is_valid_feed($url) {
+  $request = drupal_http_request($url);
+  return ($request->code == 200);
 }
 
 /**
- * Updates or removes a redirection
+ * Checks the syntax of a FeedBurner feed name. Can only contain letters,
+ * numbers, backslashes, dashes or underscores.
+ */
+function _feedburner_is_valid_feed_name($feed) {
+  return preg_match('/\\A[\\w\\x2D\\x2F]+\\z/i', $feed);
+}
+
+/**
+ * Updates or removes a redirection.
+ * @return
+ *   True if the redirect was modified, false otherwise.
  */
 function _feedburner_update_feed($feed, $feedburner = NULL) {
   $feeds = _feedburner_get_redirects();
-  if (!empty($feedburner)) {
-    $feeds[$feed] = preg_replace('/[^\\w\/\\-_]/', '', $feedburner);
+  /*if (!empty($feedburner)) {
+    $feeds[$feed] = $feedburner;
   }
   else if (isset($feeds[$feed])) {
     unset($feeds[$feed]);
-    /*if ($feed['url'] == 'rss.xml') {
-      variable_set('feedburner_feedflare', FALSE);
-    }*/
+  } else {
+    return FALSE;
+  }*/
+
+  if ($feeds[$feed] !== $feedburner) {
+  	if (empty($feedburner)) {
+      /*if ($feed['url'] == 'rss.xml') {
+        variable_set('feedburner_feedflare', FALSE);
+      }*/
+  		unset($feeds[$feed]);
+  	}
+  	else {
+  		$feeds[$feed] = $feedburner;
+  	}
+  }
+  else {
+  	return FALSE;
   }
   variable_set('feedburner_feeds', $feeds);
 
-  // Need to clear the cache for the feed page since
+  // Need to clear the cache for the feed page and also an alias if it is set
   global $base_url;
   cache_clear_all($base_url .'/'. $feed, 'cache_page');
   if (variable_get('clean_url', '0') == TRUE) {
@@ -521,4 +707,6 @@ function _feedburner_update_feed($feed, $feedburner = NULL) {
       cache_clear_all($base_url .'/'. $alias, 'cache_page');
     }
   }
+
+  return TRUE;
 }
