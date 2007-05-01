@@ -1,0 +1,10 @@
+<?php
+// $Id$
+
+/**
+ * Implementation of hook_uninstall()
+ */
+feedburner_uninstall() {
+	db_query("DELETE FROM {variable} WHERE name LIKE 'feedburner%'");
+	cache_clear_all('variables', 'cache');
+}
