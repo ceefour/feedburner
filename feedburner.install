@@ -4,7 +4,14 @@
 /**
  * Implementation of hook_uninstall()
  */
-feedburner_uninstall() {
-	db_query("DELETE FROM {variable} WHERE name LIKE 'feedburner%'");
-	cache_clear_all('variables', 'cache');
+function feedburner_uninstall() {
+  // Delete all the feedburner variables
+  $variables = db_query("SELECT name FROM variable WHERE name LIKE 'feedburner%'");
+  while ($variable = db_result($variables)) {
+    variable_del($variable);
+  }
+  
+  // Alternative method
+  //db_query("DELETE FROM {variable} WHERE name LIKE 'feedburner%'");
+  //cache_clear_all('variables', 'cache');
 }
