@@ -4,27 +4,6 @@
 // TODO: Use drupal_query_string_encode for _feedburner_do_api()
 // TODO: db_placeholders() ?
 
-/* PROJECT TIMELINE
- * X Path blacklisting
- * - Settings crud
- * - Building crud
- * X Feed verification
- * - User blog
- * - Autocompletion
- * * 1.0 ALPHA RELEASE!
- * - Feed details
- * - FeedFlare
- * - API
- * - Blocks
- * - Cron
- * * 1.0 BETA RELEASE!
- * - Documentation
- * - Localization
- * - Issue Queue
- * - Forums / Blogsphere
- * * 1.0 OFFICIAL RELEASE!
- */
-
 // Predefine some default variables
 define('FEEDBURNER_DEFAULT_USERAGENTS', 'feedburner|feedvalidator');
 define('FEEDBURNER_DEFAULT_REDIRECT_STATUS', 307);
@@ -161,14 +140,14 @@ function feedburner_perm() {
  * Implementation of hook_boot().
  */
 function feedburner_boot() {
-  $path = _feedburner_init_path();
-  _feedburner_check_redirect($path);
+  //$path = _feedburner_init_path();
+  //_feedburner_check_redirect($path);
 
   // Alternate method - simpler but has more includes and the potential to run
   // higher memory allocations on every single request (including cache views).
-  //drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
-  //$path = _feedburner_get_path();
-  //_feedburner_check_redirect($path, TRUE);
+  drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
+  $path = _feedburner_get_path();
+  _feedburner_check_redirect($path);
 }
 
 
@@ -195,7 +174,7 @@ function feedburner_boot() {
  * @param $path
  *   The current unnormalized path.
  */
-function _feedburner_check_redirect($path, $normalized = FALSE) {
+function _feedburner_check_redirect($path) {
   // Don't waste time and database hits on certain paths (admin paths, frontpage)
   // Use drupal_match_path?
   $path_blacklist =  variable_get('feedburner_path_blacklist', FEEDBURNER_DEFAULT_PATH_BLACKLIST);
@@ -209,14 +188,11 @@ function _feedburner_check_redirect($path, $normalized = FALSE) {
   $skip_redirect = (isset($_GET['redirect']) && $_GET['redirect'] == 'no');
   $useragents_regex = '/' . variable_get('feedburner_useragents', FEEDBURNER_DEFAULT_USERAGENTS) . '/i';
 
-  if ($normalized) {
-    $sql = "SELECT feedburner FROM {feedburner} WHERE path = '%s'";
-  }
-  else {
-    $sql = "SELECT f.feedburner FROM {feedburner} f LEFT JOIN {url_alias} u ON u.src = f.path WHERE f.path = '%s' OR u.dst = '%s'";
-  }
+  //$sql = "SELECT f.feedburner FROM {feedburner} f LEFT JOIN {url_alias} u ON u.src = f.path WHERE f.path = '%s' OR u.dst = '%s'";
+  //if (!$skip_redirect && !preg_match($useragents_regex, $_SERVER['HTTP_USER_AGENT']) && $feedburner = db_result(db_query($sql, $path, $path))) {
 
-  if (!$skip_redirect && !preg_match($useragents_regex, $_SERVER['HTTP_USER_AGENT']) && $feedburner = db_result(db_query($sql, $path, $path))) {
+  $sql = "SELECT feedburner FROM {feedburner} WHERE path = '%s'";
+  if (!$skip_redirect && !preg_match($useragents_regex, $_SERVER['HTTP_USER_AGENT']) && $feedburner = db_result(db_query($sql, $path))) {
     $url = _feedburner_construct_url($feedburner);
     $status = variable_get('feedburner_redirect_status', FEEDBURNER_DEFAULT_REDIRECT_STATUS);
 
@@ -281,27 +257,27 @@ function _feedburner_can_api($require_auth = FALSE) {
  * @return
  *   The current Drupal path
  */
-function _feedburner_init_path($normalize = FALSE) {
-  $path = substr(request_uri(), strlen($GLOBALS['base_path']));
-
-  // Don't think I need to support keeping the arguments
-  if (!variable_get('clean_url', 0) && preg_match('/^\?q=/', $path)) {
-    $path = preg_replace(array('/^\?q=/', '/&.*$/'), array('', '?'), $path, 1);
-  }
-  else {
-    $path = preg_replace('/\?.*$/', '', $path);
-  }
-  //if ($pos = strpos($path, '?')) {
-  //  $path = substr($path, 0, $pos);
-  //}
-  $path = strtolower(trim($path, '/'));
-
-  if ($normalize && $normal_path = db_result(db_query("SELECT src FROM {url_alias} WHERE dst = '%s'", $path))) {
-    $path = $normal_path;
-  }
-
-  return $path;
-}
+//function _feedburner_init_path($normalize = FALSE) {
+//  $path = substr(request_uri(), strlen($GLOBALS['base_path']));
+//
+//  // Don't think I need to support keeping the arguments
+//  if (!variable_get('clean_url', 0) && preg_match('/^\?q=/', $path)) {
+//    $path = preg_replace(array('/^\?q=/', '/&.*$/'), array('', '?'), $path, 1);
+//  }
+//  else {
+//    $path = preg_replace('/\?.*$/', '', $path);
+//  }
+//  //if ($pos = strpos($path, '?')) {
+//  //  $path = substr($path, 0, $pos);
+//  //}
+//  $path = strtolower(trim($path, '/'));
+//
+//  if ($normalize && $normal_path = db_result(db_query("SELECT src FROM {url_alias} WHERE dst = '%s'", $path))) {
+//    $path = $normal_path;
+//  }
+//
+//  return $path;
+//}
 
 
 /*
