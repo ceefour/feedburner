@@ -2,63 +2,80 @@
 // $Id$
 
 /**
- * Implementation of hook_install().
+ * Implementation of hook_schema().
  */
-function feedburner_install() {
-  switch ($GLOBALS['db_type']) {
-    case 'mysql':
-    case 'mysqli':
-      db_query("CREATE TABLE IF NOT EXISTS {feedburner_feeds} (
-        fid int unsigned NOT NULL default '0',
-        local_uri varchar(128) NOT NULL default '',
-        fb_uri varchar(100) NOT NULL default '',
-        verified int NOT NULL default '0',
-        details longtext,
-        PRIMARY KEY (fid, uri)
-      ) /*!40100 DEFAULT CHARACTER SET UTF8 */ ");
-    case 'pgsql':
-      break;
-  }
+function feedburner_schema() {
+  $schema['feedburner'] = array(
+    'description' => t('Stores information on FeedBurner feed redirections.'),
+    'fields' => array(
+      'path' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'description' => t('The source feed.'),
+      ),
+      'feedburner' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'description' => t('FeedBurner feed.'),
+      ),
+      'verified' => array(
+        'type' => 'int',
+        'default' => 0,
+        'unsigned' => TRUE,
+        'description' => t('Timestamp of ID verification.'),
+      ),
+      'id' => array(
+        'type' => 'int',
+        'default' => 0,
+        'unsigned' => TRUE,
+        'description' => t('Feed ID integer.'),
+      ),
+      //'email' => array(
+      //  'type' => 'int',
+      //  'size' => 'tiny',
+      //  'default' => 0,
+      //  'description' => t('Email subscriptions boolean.'),
+      //),
+      //'feedflare' => array(
+      //  'type' => 'int',
+      //  'size' => 'tiny',
+      //  'default' => 0,
+      //  'description' => t('FeedFlare boolean.'),
+      //),
+      //'awareness_api' => array(
+      //  'type' => 'int',
+      //  'size' => 'tiny',
+      //  'default' => 0,
+      //  'description' => t('Awareness API boolean.'),
+      //),
+    ),
+    'primary key' => array('path'),
+    'indexes' => array(
+      'feedburner' => array('feedburner'),
+    ),
+  );
+
+  return $schema;
 }
 
 /**
- * Implementation of hook_update_x().
- *
- * Adds the FeedBurner table and converts the currently redirecting feeds to
- * use the table since I only used a variable array in the first few versions.
+ * Implementation of hook_install().
  */
-function feedburner_update_1() {
-  $items = array();
-  $items[] = update_sql("CREATE TABLE IF NOT EXISTS {feedburner_feeds} (
-        fid int unsigned NOT NULL default '0',
-        local_uri varchar(128) NOT NULL default '',
-        fb_uri varchar(100) NOT NULL default '',
-        verified int NOT NULL default '0',
-        details longtext,
-        PRIMARY KEY (fid, uri)
-      ) /*!40100 DEFAULT CHARACTER SET UTF8 */ ");
-  $feeds = variable_get('feedburner_feeds', array());
-  foreach ($feeds as $local_uri => $fb_uri) {
-    $items[] = update_sql("INSERT INTO {feedburner_feeds} (local_uri, fb_uri) VALUES ('". $local_uri ."', '". $fb_uri ."')");
-  }
-  variable_del('feedburner_feeds');
-  return $items;
+function feedburner_install() {
+  drupal_install_schema('feedburner');
+  db_query("UPDATE {system} SET weight = -1 WHERE name = 'feedburner'");
+  drupal_set_message(t("The FeedBurner module is installed. You are ready to start burning feeds at !burn and the module's settings at !settings.", array('!settings' => l('Administer > Site configuration > FeedBurner', 'admin/settings/feedburner'), '!burn' => l('Administer > Site building > FeedBurner', 'admin/build/feedburner'))));
 }
 
 /**
  * Implementation of hook_uninstall().
- * Removes tables and variables used by this module.
  */
 function feedburner_uninstall() {
-  // Delete all the feedburner variables
-  $variables = db_query("SELECT name FROM variable WHERE name LIKE 'feedburner%'");
-  while ($variable = db_result($variables)) {
-    variable_del($variable);
+  drupal_uninstall_schema('feedburner');
+  $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'feedburner_%%'");
+  while ($variable = db_fetch_object($result)) {
+    variable_del($variable->name);
   }
-  // Alternative method, but not as kosher
-  //db_query("DELETE FROM {variable} WHERE name LIKE 'feedburner%'");
-  //cache_clear_all('variables', 'cache');
-
-  // Remove feedburner table (can't use IF EXISTS since only latest PostgreSQL supports it
-  db_query("DROP TABLE {feedburner_feeds}");
 }
