@@ -387,6 +387,9 @@ function _feedburner_save_feed($path, $feedburner = NULL) {
   $current = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
   if (empty($feedburner) && !empty($current)) {
     db_query("DELETE FROM {feedburner} WHERE path = '%s'", $path);
+    if ($current == variable_get('feedburner_feedflare_feed', 0)) {
+      variable_set('feedburner_feedflare_feed', 0);
+    }
   }
   else {
     if (!empty($current) && $current != $feedburner) {

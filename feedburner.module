@@ -344,7 +344,7 @@ function _feedburner_get_feedflare($nid, $node_type) {
   $node_types = variable_get('feedburner_feedflare_node_types', array());
   if ($feedflare_feed && in_array($node_type, $node_types)) {
     $node_url = url('node/' . $nid, array('absolute' => TRUE));
-    $feedflare = '<p>FEEDFLARE!</p><script src="http://feeds.feedburner.com/~s/' . $feedflare_feed . '?i=' . $node_url . '" type="text/javascript" charset="utf-8"></script>';
+    $feedflare = '<script src="http://feeds.feedburner.com/~s/' . $feedflare_feed . '?i=' . $node_url . '" type="text/javascript" charset="utf-8"></script>';
   }
   return $feedflare;
 }
