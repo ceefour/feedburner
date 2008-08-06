@@ -1,14 +1,10 @@
 <?php
 // $Id$
 
-// TODO: Use drupal_query_string_encode for _feedburner_do_api()
-// TODO: db_placeholders() ?
-
-// Predefine some default variables
-define('FEEDBURNER_DEFAULT_USERAGENTS', 'feedburner|feedvalidator');
-define('FEEDBURNER_DEFAULT_REDIRECT_STATUS', 307);
-define('FEEDBURNER_DEFAULT_DOMAIN', 'feeds.feedburner.com');
-define('FEEDBURNER_DEFAULT_PATH_BLACKLIST', 'admin\/.*|node');
+/**
+ * @file
+ * Integrates with FeedBurner services, primarily feed redirection.
+ */
 
 /**
  * Implementation of hook_help().
@@ -28,12 +24,7 @@ function feedburner_help($path, $arg) {
       $output = '<p>' . t('These are the settings for the FeedBurner module. Once you have everything set, check out your site\'s <a href="@link">FeedBurner feeds</a>.', array('@link' => url('admin/build/feedburner'))) . '</p>';
       return $output;
     case 'admin/build/feedburner':
-    case 'admin/build/feedburner/list':
-      //$errors = feedburner_requirements('runtime');
-      //foreach ($errors as $error) {
-      //  drupal_set_message($error['description'], 'error');
-      //}
-      $output = '<p>' . t('This is the FeedBurner site feed redirection building page. If you do not see a specific feed already listed here, do not panic; You can always burn it manually. Make sure to check out the <a href="@link">FeedBurner settings</a>.', array('@link' => url('admin/settings/feedburner'))) . '</p>';
+      $output = '<p>' . t('This is the FeedBurner site feed redirection building page. Make sure to check out the <a href="@link">FeedBurner settings</a>.', array('@link' => url('admin/settings/feedburner'))) . '</p>';
       return $output;
   }
 }
@@ -43,7 +34,6 @@ function feedburner_help($path, $arg) {
  */
 function feedburner_requirements($phase) {
   $requirements = array();
-
   if ($phase == 'runtime') {
     if (!_feedburner_can_api()) {
       $requirements['feedburner_simplexml'] = array(
@@ -53,42 +43,57 @@ function feedburner_requirements($phase) {
         'description' => t('Some FeedBurner features require the SimpleXML PHP extension (not available for PHP4).'),
       );
     }
-    elseif (!_feedburner_can_api(TRUE)) {
-      $requirements['feedburner_auth'] = array(
-        'title' => t('FeedBurner account'),
-        'value' => t('FeedBurner account not verified'),
-        'severity' => REQUIREMENT_WARNING,
-        'description' => t('Your FeedBurner account has not been verified.'),
-      );
-    }
+    //elseif (!_feedburner_can_api(TRUE)) {
+    //  $requirements['feedburner_auth'] = array(
+    //    'title' => t('FeedBurner account'),
+    //    'value' => t('FeedBurner account not verified'),
+    //    'severity' => REQUIREMENT_WARNING,
+    //    'description' => t('Your FeedBurner account has not been verified.'),
+    //  );
+    //}
   }
-
   return $requirements;
+}
+
+/**
+ * Implementation of hook_perm().
+ */
+function feedburner_perm() {
+  return array('administer FeedBurner', 'view FeedFlare');
 }
 
 /**
  * Implementation of hook_menu().
  */
 function feedburner_menu() {
-  $items = array();
-
   $items['admin/build/feedburner'] = array(
     'title' => 'FeedBurner',
-    'type' => MENU_NORMAL_ITEM,
     'description' => 'Change site feed redirections to FeedBurner.',
     'page callback' => 'feedburner_build_overview',
+    'page arguments' => array('site'),
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/build/feedburner/list'] = array(
-    'title' => 'List',
+    'title' => 'Feeds',
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
-    'access arguments' => array('administer FeedBurner'),
-    'file' => 'feedburner.admin.inc',
   );
+  foreach (_feedburner_get_feed_categories() as $key => $options) {
+    if (!isset($option['module']) || module_exists($options['module'])) {
+      $items['admin/build/feedburner/list/' . $key] = array(
+        'title' => ucfirst($key),
+        'type' => isset($options['default']) ? MENU_DEFAULT_LOCAL_TASK : MENU_LOCAL_TASK,
+        'weight' => isset($options['default']) ? -10 : 0,
+        'page callback' => 'feedburner_build_overview',
+        'page arguments' => array($key),
+        'access arguments' => array('administer FeedBurner'),
+        'file' => 'feedburner.admin.inc',
+      );
+    }
+  }
   $items['admin/build/feedburner/burn'] = array(
-    'title' => 'Burn Feed',
+    'title' => 'Burn feed',
     'type' => MENU_LOCAL_TASK,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_burn_form'),
@@ -96,7 +101,7 @@ function feedburner_menu() {
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/build/feedburner/unburn'] = array(
-    'title' => 'Unburn Feed',
+    'title' => 'Unburn feed',
     'type' => MENU_CALLBACK,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_unburn_form'),
@@ -105,7 +110,6 @@ function feedburner_menu() {
   );
   $items['admin/settings/feedburner'] = array(
     'title' => 'FeedBurner',
-    'type' => MENU_NORMAL_ITEM,
     'description' => 'Administer FeedBurner integration.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_settings_form'),
@@ -118,109 +122,154 @@ function feedburner_menu() {
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
-  $items['feedburner/test'] = array(
-    'page callback' => '_feedburner_test',
-    'type' => MENU_CALLBACK,
-    'access arguments' => array('administer FeedBurner'),
-  );
-
+  //$items['feedburner/verify'] = array(
+  //  'page callback' => '_feedburner_verify',
+  //  'type' => MENU_CALLBACK,
+  //  'access arguments' => array('administer FeedBurner'),
+  //  'file' => 'feedburner.admin.inc',
+  //);
   return $items;
 }
-
-
-/**
- * Implementation of hook_perm().
- */
-function feedburner_perm() {
-  return array('administer FeedBurner', 'view FeedFlare');
-}
-
 
 /**
  * Implementation of hook_boot().
  */
 function feedburner_boot() {
-  //$path = _feedburner_init_path();
-  //_feedburner_check_redirect($path);
-
-  // Alternate method - simpler but has more includes and the potential to run
-  // higher memory allocations on every single request (including cache views).
   drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
   $path = _feedburner_get_path();
   _feedburner_check_redirect($path);
 }
 
+/**
+ * Implementation of hook_nodeapi().
+ *
+ * Inserts FeedFlare into nodes.
+ */
+function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
+  if ($op == 'view' && $node->build_mode != NODE_BUILD_PREVIEW && user_access('view FeedFlare')) {
+    $feedburner_display = variable_get('feedburner_feedflare_display', array('page'));
+    if (($teaser && in_array('teaser', $feedburner_display)) || ($page && in_array('page', $feedburner_display))) {
+      $feedflare = _feedburner_get_feedflare($node->nid, $node->type);
+      if ($feedflare) {
+        $node->content['feedflare'] = array(
+          '#value' => $feedflare,
+          '#weight' => 10,
+        );
+      }
+    }
+  }
+}
 
 /**
- * Implementation of hook_exit().
+ * Implementation of hook_user().
+ *
+ * Displays, validates and saves an option to redirect a user's blog feed.
  */
-//function feedburner_exit() {
-//  _feedburner_clear_feed_cache();
-//}
+function feedburner_user($op, &$edit, &$account, $category = NULL) {
+  if ($op == 'form' && $category == 'account' && user_access('create blog entries') && variable_get('feedburner_blogs', 0)) {
+    $user_blog_url = 'blog/' . $account->uid . '/feed';
+    $form['feedburner'] = array(
+      '#type' => 'fieldset',
+      '#title' => t('Your Blog\'s FeedBurner Settings'),
+      '#weight' => 1,
+      '#collapsible' => TRUE,
+      '#description' => t('Requests for your blog\'s feed (<a href="@url">@url</a>) will be redirected to the FeedBurner feed below. Leave this blank to disable redirection.', array('@url' => url($user_blog_url, array('absolute' => TRUE)))),
+    );
+    $form['feedburner']['feedburner_user_blog'] = array(
+      '#type' => 'textfield',
+      '#maxlength' => 100,
+      '#size' => 30,
+      '#default_value' => db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $user_blog_url)),
+      '#field_prefix' => _feedburner_construct_url(),
+      '#description' => t('This field is case-sensitive and alphanumeric.'),
+    );
+    return $form;
+  }
+  elseif ($op == 'validate' && isset($edit['feedburner_user_blog'])) {
+    if (preg_match('/[^\w-]/', $edit['feedburner_user_blog'])) {
+      form_set_error('feedburner_user_blog', 'Invalid FeedBurner feed name');
+    }
+  }
+  elseif ($op == 'update' && isset($edit['feedburner_user_blog'])) {
+    require_once drupal_get_path('module', 'feedburner') . '/feedburner.admin.inc';
+    $user_blog_url = 'blog/' . $account->uid . '/feed';
+    _feedburner_save_feed($user_blog_url, $edit['feedburner_user_blog']);
+    $edit['feedburner_user_blog'] = NULL;
+  }
+  elseif ($op == 'delete') {
+    require_once drupal_get_path('module', 'feedburner') . '/feedburner.admin.inc';
+    $user_blog_url = 'blog/' . $account->uid . '/feed';
+    _feedburner_save_feed($user_blog_url);
+  }
+}
+
+/**
+ * Implementation of hook_block().
+ */
+function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
+  switch ($op) {
+    case 'list':
+      $blocks[0] = array(
+        'info' => t('FeedBurner FeedFlare'),
+        'cache' => BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE,
+      );
+      return $blocks;
+    case 'configure':
+      break;
+    case 'save':
+      break;
+    case 'view':
+      switch ($delta) {
+        case 0:
+          if ((arg(0) == 'node') && is_numeric(arg(1)) && (arg(2) == NULL)) {
+            $node = node_load(arg(1));
+            $feedflare = _feedburner_get_feedflare($node->nid, $node->type);
+            if ($feedflare) {
+              $block = array(
+                'subject' => t('FeedFlare'),
+                'content' => $feedflare,
+              );
+            }
+          }
+          break;
+      }
+      return $block;
+  }
+}
 
 
 /**
  * Check to see if the current path has a FeedBurner feed redirect, and perform
  * the redirection as necessary.
  *
- * The $path parameter could be normalized (unaliased) or not. Right now it is
- * preferred to be unnormalized because instead of two separate simple queries
- * (one to lookup the alias and the other to lookup the FeedBurner redirect),
- * we can perform just one simple left join query with the FeedBurner and url
- * alias tables, minimizing database hits. I may be wrong in trying to optimize
- * this way, but it feels good to try. If I want to use two separate queries,
- * there are minimal changes needed.
- *
  * @param $path
- *   The current unnormalized path.
+ *   The current request path.
  */
 function _feedburner_check_redirect($path) {
   // Don't waste time and database hits on certain paths (admin paths, frontpage)
-  // Use drupal_match_path?
-  $path_blacklist =  variable_get('feedburner_path_blacklist', FEEDBURNER_DEFAULT_PATH_BLACKLIST);
-  if (empty($path) || empty($path_blacklist) || preg_match('/^(' . $path_blacklist . ')$/i', $path)) {
-  //if (empty($path) || preg_match('/^admin\//i', $path) || $path == variable_get('site_frontpage', 'node')) {
+  if (drupal_is_front_page() || preg_match('/^admin\//i', $path)) {
     return;
   }
 
-  $feedburner = NULL;
-  $sql = NULL;
   $skip_redirect = (isset($_GET['redirect']) && $_GET['redirect'] == 'no');
-  $useragents_regex = '/' . variable_get('feedburner_useragents', FEEDBURNER_DEFAULT_USERAGENTS) . '/i';
+  $useragents_regex = variable_get('feedburner_useragents', '/feedburner|feedvalidator/i');
 
-  //$sql = "SELECT f.feedburner FROM {feedburner} f LEFT JOIN {url_alias} u ON u.src = f.path WHERE f.path = '%s' OR u.dst = '%s'";
-  //if (!$skip_redirect && !preg_match($useragents_regex, $_SERVER['HTTP_USER_AGENT']) && $feedburner = db_result(db_query($sql, $path, $path))) {
-
-  $sql = "SELECT feedburner FROM {feedburner} WHERE path = '%s'";
-  if (!$skip_redirect && !preg_match($useragents_regex, $_SERVER['HTTP_USER_AGENT']) && $feedburner = db_result(db_query($sql, $path))) {
+  if (!$skip_redirect
+      && !preg_match($useragents_regex, $_SERVER['HTTP_USER_AGENT'])
+      && $feedburner = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path))) {
     $url = _feedburner_construct_url($feedburner);
-    $status = variable_get('feedburner_redirect_status', FEEDBURNER_DEFAULT_REDIRECT_STATUS);
+    $status = variable_get('feedburner_redirect_status', 307);
 
-    // The following is a condensed copy of drupal_goto since it is not yet
-    // available due to early execution in the bootstrap process.
+    // Need to make a condensed copy of drupal_goto since common.inc is not yet
+    // loaded (it will be if we hit DRUPAL_BOOTSTRAP_FULL). We can skip lots of
+    // unneeded includes and processing since we are now going to redirect the
+    // user and not continue any more Drupal loading.
     module_invoke_all('exit', $url);
     session_write_close();
     header('Location: ' . $url, TRUE, (int) $status);
     exit();
   }
-  //elseif ($feedburner && variable_get('cache', CACHE_DISABLED) != CACHE_DISABLED) {
-  //  _feedburner_clear_feed_cache($GLOBAL['base_root'] . request_uri());
-  //}
 }
-
-
-//function _feedburner_clear_feed_cache($cid = NULL) {
-//  static $removals = array();
-//  if (!empty($cid)) {
-//    $removals[] = $cid;
-//  }
-//  else {
-//    while ($cid = array_pop($removals)) {
-//      cache_clear_all($cid, 'cache_page');
-//    }
-//  }
-//}
-
 
 /**
  * Constructs an absolute url based on a FeedBurner feed URI.
@@ -231,54 +280,20 @@ function _feedburner_check_redirect($path) {
  *   The full URL of the FeedBurner feed.
  */
 function _feedburner_construct_url($uri = '') {
-  return 'http://' . variable_get('feedburner_domain', FEEDBURNER_DEFAULT_DOMAIN) . '/' . $uri;
+  return 'http://' . variable_get('feedburner_domain', 'feeds.feedburner.com') . '/' . $uri;
 }
-
 
 /**
  * Determines if we can use the FeedBurner API and if desired, loads the API
  * functions.
  */
-function _feedburner_can_api($require_auth = FALSE) {
-  return extension_loaded('SimpleXML') && function_exists('simplexml_load_string') && (!$require_auth || variable_get('feedburner_auth', NULL));
+function _feedburner_can_api($valid_account = FALSE) {
+  return extension_loaded('SimpleXML') && function_exists('simplexml_load_string') && (!$valid_account || variable_get('feedburner_auth', NULL));
 }
 
-
-/*
- * Gets the current Drupal path and also optionally normalize the path.
- *
- * This function is an alternative to using $_GET['q'] since this is usually
- * called before the path bootstrap process and $_GET['q'] is initialized.
- * The request_uri function and the base path global variable are used to get a
- * reliable path under early Drupal execution.
- *
- * @param $normalize
- *   Boolean, default FALSE
- * @return
- *   The current Drupal path
- */
-//function _feedburner_init_path($normalize = FALSE) {
-//  $path = substr(request_uri(), strlen($GLOBALS['base_path']));
-//
-//  // Don't think I need to support keeping the arguments
-//  if (!variable_get('clean_url', 0) && preg_match('/^\?q=/', $path)) {
-//    $path = preg_replace(array('/^\?q=/', '/&.*$/'), array('', '?'), $path, 1);
-//  }
-//  else {
-//    $path = preg_replace('/\?.*$/', '', $path);
-//  }
-//  //if ($pos = strpos($path, '?')) {
-//  //  $path = substr($path, 0, $pos);
-//  //}
-//  $path = strtolower(trim($path, '/'));
-//
-//  if ($normalize && $normal_path = db_result(db_query("SELECT src FROM {url_alias} WHERE dst = '%s'", $path))) {
-//    $path = $normal_path;
-//  }
-//
-//  return $path;
+//function _feedburner_request_api() {
+//  // drupal_query_string_encode
 //}
-
 
 /*
  * Extract part of the current Drupal path from a certain 'argument' onward.
@@ -286,7 +301,7 @@ function _feedburner_can_api($require_auth = FALSE) {
  * For example, if the path is 'http://example-drupal/blah/foo/foobar/ferzle':
  *   $pos = 0, returns 'blah/foo/foobar/ferzle'
  *   $pos = 2, returns 'foobar/ferzle'
- *   $pos = 4, returns NULL
+ *   $pos = 4, returns ''
  *
  * @param $pos
  *   The argument of the path to start at, use 0 to get the whole path
@@ -294,131 +309,49 @@ function _feedburner_can_api($require_auth = FALSE) {
  *   The extracted part of the path
  */
 function _feedburner_get_path($pos = 0) {
-  $path = $_GET['q'];
-  $path = str_replace(' ', '+', $path);
+  $path = str_replace(' ', '+', $_GET['q']);
   if ($pos > 0) {
     $path = explode('/', $path, $pos);
-    $path = (count($path) >= $pos ? end($path) : NULL);
+    $path = (count($path) >= $pos ? end($path) : '');
   }
   return $path;
 }
 
-
-function _feedburner_load_feed($uri, $fields = array('path', 'feedburner')) {
-  $fields = implode(', ', $fields);
-  $sql = "SELECT %s FROM {feedburner} WHERE path = '%s'";
-  return db_fetch_object(db_query($sql, $fields, $uri));
+/**
+ * Returns a list of feed categories.
+ */
+function _feedburner_get_feed_categories() {
+  return array(
+    'site' => array('default' => TRUE),
+    'blogs' => array('module' => 'blog'),
+    'taxonomy' => array('module' => 'taxonomy'),
+  );
 }
 
-
-function _feedburner_get_feedflare($nid, $node_type, $uid = NULL) {
+/**
+ * Gets the script for feedflare based on node id and node type.
+ *
+ * @param $nid
+ *   The node id.
+ * @param $node_types
+ *   The node's type (story, blog, etc.).
+ * @return
+ *   A JavaScript code for FeedFlare.
+ */
+function _feedburner_get_feedflare($nid, $node_type) {
+  $feedflare = '';
   $feedflare_feed = variable_get('feedburner_feedflare_feed', 0);
   $node_types = variable_get('feedburner_feedflare_node_types', array());
-  $feedburner_script = NULL;
-
-  if (!empty($feedflare_feed) && isset($node_types[$node_type])) {
-    //if ($node_type == 'blog' && !empty($uid) && variable_get('feedburner_blogs', FALSE)) {
-    //  $user_feed = _feedburner_load_feed('blog/' . $uid . '/feed');
-    //  if (!empty($user_feed->feedburner)) {
-    //    $feedflare_feed = $user_feed->feedburner;
-    //  }
-    //}
-
+  if ($feedflare_feed && in_array($node_type, $node_types)) {
     $node_url = url('node/' . $nid, array('absolute' => TRUE));
-    $feedburner_script = "<script src=\"http://feeds.feedburner.com/~s/" . $feedflare_feed . "?i=" . $node_url . "\" type=\"text/javascript\" charset=\"utf-8\"></script>\n";
+    $feedflare = '<p>FEEDFLARE!</p><script src="http://feeds.feedburner.com/~s/' . $feedflare_feed . '?i=' . $node_url . '" type="text/javascript" charset="utf-8"></script>';
   }
-
-  return $feedburner_script;
-  // feedburner_standardstats
-  //"<script src=\"http://feeds.feedburner.com/~s/" . $feedflare_feed . "\" type=\"text/javascript\" charset=\"utf-8\"></script>\n";
+  return $feedflare;
 }
 
-
-function _feedburner_test() {
-  require_once('feedburner.admin.inc');
-  echo "<pre>";
-
-function system_get_files_database2(&$files, $type) {
-  // Extract current files from database.
-  $result = db_query("SELECT filename, name, type, status, throttle, schema_version FROM {system} WHERE type = '%s'", $type);
-  while ($file = db_fetch_object($result)) {
-    if (isset($files[$file->name]) && is_object($files[$file->name])) {
-      $file->old_filename = $file->filename;
-      foreach ($file as $key => $value) {
-        if (!isset($files[$file->name]) || !isset($files[$file->name]->$key)) {
-          $files[$file->name]->$key = $value;
-        }
-      }
-    }
-    else {
-      //db_query("DELETE FROM {system} WHERE filename = '%s'", $file->filename);
-    }
-  }
-}
-
-  // Get current list of modules
-  $files = drupal_system_listing('\.module$', 'modules', 'name', 0);
-
-  // Extract current files from database.
-  system_get_files_database2($files, 'module');
-
-  ksort($files);
-
-  // Set defaults for module info
-  $defaults = array(
-    'dependencies' => array(),
-    'dependents' => array(),
-    'description' => '',
-    'version' => NULL,
-    'php' => DRUPAL_MINIMUM_PHP,
-  );
-
-  db_query("DELETE FROM {system2} WHERE type = 'module'");
-
-  foreach ($files as $filename => $file) {
-    // Look for the info file.
-    $file->info = drupal_parse_info_file(dirname($file->filename) .'/'. $file->name .'.info');
-
-    // Skip modules that don't provide info.
-    if (empty($file->info)) {
-      unset($files[$filename]);
-      continue;
-    }
-    // Merge in defaults and save.
-    $files[$filename]->info = $file->info + $defaults;
-
-    // Invoke hook_system_info_alter() to give installed modules a chance to
-    // modify the data in the .info files if necessary.
-    drupal_alter('system_info', $files[$filename]->info, $files[$filename]);
-
-    // Log the critical hooks implemented by this module.
-    $bootstrap = 0;
-    foreach (bootstrap_hooks() as $hook) {
-      if (module_hook($file->name, $hook)) {
-        $bootstrap = 1;
-        break;
-      }
-    }
-
-    if (!isset($file->status)) {
-      // This is a new module.
-      $file->status = 0;
-      $file->throttle = 0;
-      $file->schema_version = -1;
-    }
-
-    db_query("INSERT INTO {system2} (name, info, type, filename, status, throttle, bootstrap, schema_version) VALUES ('%s', '%s', '%s', '%s', %d, %d, %d, %d)", $file->name, serialize($files[$filename]->info), 'module', $file->filename, $file->status, $file->throttle, $bootstrap, $file->schema_version);
-
-  }
-  $files = _module_build_dependencies($files);
-  die();
-
-  echo "</pre>";
-  die();
-  return $output;
-}
-
-
+/**
+ * Bleh.
+ */
 function _feedburner_blurb() {
   return '<p style="text-align: center; font-size: smaller;">' . t('This module was developed by <a href="@link-dave">Dave Reid</a> with assistance from <a href="@link-feedburner">FeedBurner</a>.<br />Please consider <a href="@link-review">reviewing this module on drupalmodules.com</a> or <a href="@link-donate">donating to the developer\'s replacement laptop fund</a>.', array('@link-dave' => 'http://davereid.net/', '@link-feedburner' => 'http://www.feedburner.com/', '@link-review' => 'http://drupalmodules.com/module/feedburner', '@link-donate' => 'http://davereid.net/content/laptop-fund')) . '</p>';
 }

@@ -2,6 +2,11 @@
 // $Id$
 
 /**
+ * @file
+ * Install and uninstall schema and functions for the feedburner module.
+ */
+
+/**
  * Implementation of hook_schema().
  */
 function feedburner_schema() {
@@ -16,7 +21,7 @@ function feedburner_schema() {
       ),
       'feedburner' => array(
         'type' => 'varchar',
-        'length' => 128,
+        'length' => 100,
         'not null' => TRUE,
         'description' => t('FeedBurner feed.'),
       ),
@@ -26,29 +31,11 @@ function feedburner_schema() {
         'unsigned' => TRUE,
         'description' => t('Timestamp of ID verification.'),
       ),
-      'id' => array(
-        'type' => 'int',
-        'default' => 0,
-        'unsigned' => TRUE,
-        'description' => t('Feed ID integer.'),
-      ),
-      //'email' => array(
+      //'id' => array(
       //  'type' => 'int',
-      //  'size' => 'tiny',
       //  'default' => 0,
-      //  'description' => t('Email subscriptions boolean.'),
-      //),
-      //'feedflare' => array(
-      //  'type' => 'int',
-      //  'size' => 'tiny',
-      //  'default' => 0,
-      //  'description' => t('FeedFlare boolean.'),
-      //),
-      //'awareness_api' => array(
-      //  'type' => 'int',
-      //  'size' => 'tiny',
-      //  'default' => 0,
-      //  'description' => t('Awareness API boolean.'),
+      //  'unsigned' => TRUE,
+      //  'description' => t('Feed ID integer.'),
       //),
     ),
     'primary key' => array('path'),
@@ -66,7 +53,7 @@ function feedburner_schema() {
 function feedburner_install() {
   drupal_install_schema('feedburner');
   db_query("UPDATE {system} SET weight = -1 WHERE name = 'feedburner'");
-  drupal_set_message(t("The FeedBurner module is installed. You are ready to start burning feeds at !burn and the module's settings at !settings.", array('!settings' => l('Administer > Site configuration > FeedBurner', 'admin/settings/feedburner'), '!burn' => l('Administer > Site building > FeedBurner', 'admin/build/feedburner'))));
+  drupal_set_message(t('The FeedBurner module was installed successfully. To start burning your site\'s feeds, go to <a href="@burn-link">Administer >> Build >> FeedBurner</a>. To view and change settings, go to <a href="@settings-link">Administer >> Settings >> FeedBurner</a>.', array('@burn-link' => url('admin/build/feedburner'), '@settings-link' => url('admin/settings/feedburner'))));
 }
 
 /**
