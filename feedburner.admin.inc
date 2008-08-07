@@ -18,10 +18,13 @@ function feedburner_build_overview($cat) {
   );
 
   $feeds = _feedburner_get_feeds($cat, array('match' => $keys));
-  $rows = array();
+  $row_limit = 20;
+  $feeds = _feedburner_build_pager($feeds, $row_limit);
 
+  $rows = array();
   foreach ($feeds as $feed) {
     $row = array();
+    //$row[] = l($feed['path'] . (isset($feed['alias']) ? ' (' . $feed['alias'] . ')' : ''), $feed['path']);
     $row[] = l((isset($feed['alias']) ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']), $feed['path']);
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
@@ -31,9 +34,9 @@ function feedburner_build_overview($cat) {
       $row[] = l(t('Source'), $feed['path'], array('query' => 'redirect=no'));
     }
     else {
-      $row[] = '-';
-      $row[] = l(t('Burn'), 'admin/build/feedburner/burn/' . $feed['path']);
       $row[] = '';
+      $row[] = '';
+      $row[] = l(t('Burn'), 'admin/build/feedburner/burn/' . $feed['path']);
       $row[] = '';
       $row[] = '';
     }
@@ -46,10 +49,22 @@ function feedburner_build_overview($cat) {
   }
 
   $output .= theme('table', $header, $rows);
-
+  $output .= theme('pager', NULL, $row_limit);
   $output .= _feedburner_blurb();
-  //drupal_add_js('misc/collapse.js');
   return $output;
+}
+
+/**
+ * Copy of the pager_query function, meant to work on arrays.
+ */
+function _feedburner_build_pager($array, $limit = 10) {
+  global $pager_page_array, $pager_total, $pager_total_items;
+  $page = isset($_GET['page']) ? $_GET['page'] : '';
+  $pager_page_array = explode(',', $page);
+  $pager_total_items[0] = count($array);
+  $pager_total[0] = ceil($pager_total_items[0] / $limit);
+  $pager_page_array[0] = max(0,  min((int)$pager_page_array[0], ((int)$pager_total[0]) - 1));
+  return array_splice($array, $pager_page_array[0] * $limit, $limit);
 }
 
 /**
@@ -147,7 +162,8 @@ function feedburner_burn_form() {
 }
 
 function feedburner_burn_form_validate($form, &$form_state) {
-  $path = $form_state['values']['path'];
+  $path =& $form_state['values']['path'];
+  $path = drupal_get_normal_path($path);
   $feedburner = $form_state['values']['feedburner'];
   $path_menu = menu_get_item($path);
   if (!valid_url($path) || !$path_menu || !$path_menu['access']) {
@@ -249,7 +265,7 @@ function feedburner_settings_form() {
   );
   $form['feedflare']['feedburner_feedflare_feed'] = array(
     '#type' => 'select',
-    '#title' => t('FeedFlare/Standard Stats feed'),
+    '#title' => t('FeedFlare/Standard Stats/Ad Network feed'),
     '#default_value' => variable_get('feedburner_feedflare_feed', 0),
     '#options' => $feeds,
   );
@@ -407,7 +423,6 @@ function _feedburner_save_feed($path, $feedburner = NULL) {
 
 // TODO: Split into _get_feeds and _process_feeds?
 function _feedburner_get_feeds($cat = 'site', $options = array()) {
-
   $default_options = array('sort' => TRUE, 'alias' => TRUE, 'feedburner' => TRUE, 'match' => FALSE);
   $options = array_merge($default_options, $options);
   $feeds = array();
@@ -620,8 +635,9 @@ function _feedburner_verify_feed($local, $feedburner) {
 }
 
 function feedburner_autocomplete($cat) {
-  $key = trim(_feedburner_get_path(4));
+  $key = trim(_feedburner_get_path(5));
   $feeds = _feedburner_get_feeds($cat, array('match' => $key, 'feedburner' => FALSE));
+  $feeds = array_slice($feeds, 0, 10);
   $keepers = array();
   foreach ($feeds as $feed) {
     if ($cat == 'feedburner') {
@@ -629,9 +645,6 @@ function feedburner_autocomplete($cat) {
     }
     else {
       $keepers[$feed['path']] = ($feed['alias'] ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']) . ($feed['description'] ? ' - ' . $feed['description'] : '');
-    }
-    if (count($keepers) == 10) {
-      break;
     }
   }
   print drupal_to_js($keepers);

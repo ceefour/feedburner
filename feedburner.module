@@ -116,13 +116,13 @@ function feedburner_menu() {
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
-  $items['feedburner/autocomplete'] = array(
+  $items['admin/feedburner/autocomplete'] = array(
     'page callback' => 'feedburner_autocomplete',
     'type' => MENU_CALLBACK,
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
-  //$items['feedburner/verify'] = array(
+  //$items['admin/feedburner/verify'] = array(
   //  'page callback' => '_feedburner_verify',
   //  'type' => MENU_CALLBACK,
   //  'access arguments' => array('administer FeedBurner'),
@@ -147,15 +147,13 @@ function feedburner_boot() {
  */
 function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
   if ($op == 'view' && $node->build_mode != NODE_BUILD_PREVIEW && user_access('view FeedFlare')) {
-    $feedburner_display = variable_get('feedburner_feedflare_display', array('page'));
-    if (($teaser && in_array('teaser', $feedburner_display)) || ($page && in_array('page', $feedburner_display))) {
-      $feedflare = _feedburner_get_feedflare($node->nid, $node->type);
-      if ($feedflare) {
-        $node->content['feedflare'] = array(
-          '#value' => $feedflare,
-          '#weight' => 10,
-        );
-      }
+    $display = $teaser ? 'teaser' : ($page ? 'page' : NULL);
+    $feedflare_display = variable_get('feedburner_feedflare_display', array('page'));
+    if (in_array($display, $feedflare_display) && $feedflare = _feedburner_get_feedflare($node->nid, $node->type)) {
+      $node->content['feedflare'] = array(
+        '#value' => $feedflare,
+        '#weight' => 10,
+      );
     }
   }
 }
@@ -207,33 +205,30 @@ function feedburner_user($op, &$edit, &$account, $category = NULL) {
  * Implementation of hook_block().
  */
 function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
-  switch ($op) {
-    case 'list':
-      $blocks[0] = array(
-        'info' => t('FeedBurner FeedFlare'),
-        'cache' => BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE,
-      );
-      return $blocks;
-    case 'configure':
-      break;
-    case 'save':
-      break;
-    case 'view':
-      switch ($delta) {
-        case 0:
-          if ((arg(0) == 'node') && is_numeric(arg(1)) && (arg(2) == NULL)) {
-            $node = node_load(arg(1));
-            $feedflare = _feedburner_get_feedflare($node->nid, $node->type);
-            if ($feedflare) {
-              $block = array(
-                'subject' => t('FeedFlare'),
-                'content' => $feedflare,
-              );
-            }
+  if ($op == 'list') {
+    $blocks[0]['info'] = t('FeedBurner FeedFlare');
+    $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
+    //$blocks[0]['pages'] = 'node/*';
+    //$blocks[0]['visibility'] = 1;
+    return $blocks;
+  }
+  //elseif ($op == 'configure') {
+  //}
+  //elseif ($op == 'save') {
+  //}
+  elseif ($op == 'view') {
+    $block = array();
+    switch ($delta) {
+      case 0:
+        if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2) == NULL) {
+          $node = node_load(arg(1));
+          if ($feedflare = _feedburner_get_feedflare($node->nid, $node->type)) {
+            $block['subject'] = t('FeedFlare');
+            $block['content'] = $feedflare;
           }
-          break;
-      }
-      return $block;
+        }
+        return $block;
+    }
   }
 }
 
@@ -339,14 +334,12 @@ function _feedburner_get_feed_categories() {
  *   A JavaScript code for FeedFlare.
  */
 function _feedburner_get_feedflare($nid, $node_type) {
-  $feedflare = '';
   $feedflare_feed = variable_get('feedburner_feedflare_feed', 0);
-  $node_types = variable_get('feedburner_feedflare_node_types', array());
-  if ($feedflare_feed && in_array($node_type, $node_types)) {
-    $node_url = url('node/' . $nid, array('absolute' => TRUE));
-    $feedflare = '<script src="http://feeds.feedburner.com/~s/' . $feedflare_feed . '?i=' . $node_url . '" type="text/javascript" charset="utf-8"></script>';
+  $feedflare_node_types = variable_get('feedburner_feedflare_node_types', array());
+  if ($feedflare_feed && in_array($node_type, $feedflare_node_types)) {
+    return '<script src="http://feeds.feedburner.com/~s/' . $feedflare_feed . '?i=' . url('node/' . $nid, array('absolute' => TRUE)) . '" type="text/javascript" charset="utf-8"></script>';
   }
-  return $feedflare;
+  return FALSE;
 }
 
 /**
