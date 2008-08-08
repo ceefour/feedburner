@@ -56,6 +56,42 @@ function feedburner_install() {
   drupal_set_message(t('The FeedBurner module was installed successfully. To start burning your site\'s feeds, go to <a href="@burn-link">Administer >> Build >> FeedBurner</a>. To view and change settings, go to <a href="@settings-link">Administer >> Settings >> FeedBurner</a>.', array('@burn-link' => url('admin/build/feedburner'), '@settings-link' => url('admin/settings/feedburner'))));
 }
 
+function feedburner_update_6000() {
+  $ret = array();
+
+  // If new tables not found, install the new schema
+  if (!db_table_exists('feedburner')) {
+    drupal_install_schema('feedburner');
+  }
+
+  // Update from 5.x-0.5 version
+  $old_feeds = variable_get('feedburner_feeds', array());
+  foreach ($old_feeds as $path => $feedburner) {
+    $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES (" . $path . " , " . $feedburner . ")");
+  }
+  variable_del('feedburner_feeds');
+
+  // Update from 5.x-1.x version
+  if (db_table_exists('feedburner_feeds')) {
+    $old_feeds = db_query("SELECT local_uri, fb_uri FROM {feedburner_feeds}");
+    while ($old_feed = db_fetch_object($old_feeds)) {
+      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES (" . $old_feed->local_uri . " , " . $old_feed->fb_uri . ")");
+    }
+    db_drop_table($ret, 'feedburner_feeds');
+  }
+
+  // Convert old useragent variable to full regex expression
+  $useragents = variable_get('feedburner_useragents', '/feedburner|feedvalidator/i');
+  if (!preg_match('%^/.*/i$%', $useragents)) {
+    variable_set('feedburner_useragents', '/' . $useragents . '/i');
+  }
+
+  db_query("UPDATE {system} SET weight = -1 WHERE name = 'feedburner'");
+  cache_clear_all();
+  menu_rebuild();
+  return $ret;
+}
+
 /**
  * Implementation of hook_uninstall().
  */
