@@ -13,7 +13,6 @@ function feedburner_build_overview($cat) {
   $header = array(
     array('data' => t('Local path')),
     array('data' => t('FeedBurner')),
-    array('data' => t('Verified')),
     array('data' => t('Operations'), 'colspan' => '3'),
   );
 
@@ -28,13 +27,11 @@ function feedburner_build_overview($cat) {
     $row[] = l((isset($feed['alias']) ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']), $feed['path']);
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
-      $row[] = $feed['verified'] ? t('Yes') : t('No');
       $row[] = l(t('Edit'), 'admin/build/feedburner/burn/' . $feed['path']);
       $row[] = l(t('Unburn'), 'admin/build/feedburner/unburn/' . $feed['path']);
       $row[] = l(t('Source'), $feed['path'], array('query' => 'redirect=no'));
     }
     else {
-      $row[] = '';
       $row[] = '';
       $row[] = l(t('Burn'), 'admin/build/feedburner/burn/' . $feed['path']);
       $row[] = '';
@@ -123,8 +120,7 @@ function feedburner_build_filter_form_submit_reset($form, &$form_state) {
 
 function feedburner_burn_form() {
   $path = _feedburner_get_path(5);
-  $feed = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
-  //$feed = _feedburner_load_feed($path);
+  $feedburner = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
 
   $form['path'] = array(
     '#type' => 'textfield',
@@ -134,17 +130,17 @@ function feedburner_burn_form() {
     '#size' => 45,
     '#description' => t('Specify the existing feed on your site from which to redirect.'),
     '#field_prefix' => url(NULL, array('absolute' => TRUE)) . (variable_get('clean_url', 0) ? '' : '?q='),
-    '#autocomplete_path' => 'feedburner/autocomplete/all',
+    '#autocomplete_path' => 'admin/feedburner/autocomplete/all',
   );
   $form['feedburner'] = array(
     '#type' => 'textfield',
     '#title' => t('FeedBurner Feed'),
-    '#default_value' => $feed,
+    '#default_value' => $feedburner,
     '#maxlength' => 100,
     '#size' => 45,
     '#description' => t('Requests to the above feed will be requested to this FeedBurner feed. This field is case-sensitive and alphanumeric.'),
     '#field_prefix' => _feedburner_construct_url(),
-    '#autocomplete_path' => 'feedburner/autocomplete/feedburner',
+    '#autocomplete_path' => 'admin/feedburner/autocomplete/feedburner',
   );
 
   //$form['options'] = array(
@@ -631,7 +627,7 @@ function _feedburner_verify_feed($local, $feedburner) {
     }
   }
 
-  db_query("UPDATE {feedburner} SET verified = %d WHERE path = '%s' AND feedburner = '%s'", $results[3], $local, $feedburner);
+  //db_query("UPDATE {feedburner} SET verified = %d WHERE path = '%s' AND feedburner = '%s'", $results[3], $local, $feedburner);
 }
 
 function feedburner_autocomplete($cat) {

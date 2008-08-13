@@ -25,12 +25,12 @@ function feedburner_schema() {
         'not null' => TRUE,
         'description' => t('FeedBurner feed.'),
       ),
-      'verified' => array(
-        'type' => 'int',
-        'default' => 0,
-        'unsigned' => TRUE,
-        'description' => t('Timestamp of ID verification.'),
-      ),
+      //'verified' => array(
+      //  'type' => 'int',
+      //  'default' => 0,
+      //  'unsigned' => TRUE,
+      //  'description' => t('Timestamp of ID verification.'),
+      //),
       //'id' => array(
       //  'type' => 'int',
       //  'default' => 0,
@@ -59,9 +59,13 @@ function feedburner_install() {
 function feedburner_update_6000() {
   $ret = array();
 
-  // If new tables not found, install the new schema
   if (!db_table_exists('feedburner')) {
-    drupal_install_schema('feedburner');
+    // If new tables not found, install the new schema
+    $ret[] = drupal_install_schema('feedburner');
+  }
+  elseif (db_column_exists('feedburner', 'verified')) {
+    // Remove verified column
+    db_drop_field($ret, 'feedburner', 'verified');
   }
 
   // Update from 5.x-0.5 version
@@ -97,8 +101,8 @@ function feedburner_update_6000() {
  */
 function feedburner_uninstall() {
   drupal_uninstall_schema('feedburner');
-  $result = db_query("SELECT name FROM {variable} WHERE name LIKE 'feedburner_%%'");
-  while ($variable = db_fetch_object($result)) {
+  $variables = db_query("SELECT name FROM {variable} WHERE name LIKE 'feedburner_%%'");
+  while ($variable = db_fetch_object($variables)) {
     variable_del($variable->name);
   }
 }
