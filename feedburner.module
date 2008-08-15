@@ -279,16 +279,11 @@ function _feedburner_construct_url($uri = '') {
 }
 
 /**
- * Determines if we can use the FeedBurner API and if desired, loads the API
- * functions.
+ * Determines if we can use the FeedBurner API.
  */
 function _feedburner_can_api($valid_account = FALSE) {
-  return extension_loaded('SimpleXML') && function_exists('simplexml_load_string') && (!$valid_account || variable_get('feedburner_auth', NULL));
+  return extension_loaded('SimpleXML') && function_exists('simplexml_load_string') && (!$valid_account || variable_get('feedburner_auth', FALSE));
 }
-
-//function _feedburner_request_api() {
-//  // drupal_query_string_encode
-//}
 
 /*
  * Extract part of the current Drupal path from a certain 'argument' onward.

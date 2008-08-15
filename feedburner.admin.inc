@@ -367,11 +367,10 @@ function feedburner_settings_form_validate($form, &$form_state) {
   //  form_set_error('feedburner_username', 'Invalid FeedBurner username.');
   //}
   //if (!preg_match('/^\w*$/', $values['feedburner_password'])) {
+  //  //TODO: Can match whitespace characters
   //  form_set_error('feedburner_username', 'Invalid FeedBurner password.');
   //}
-  //else {
-  //  unset($values['feedburner_password']);
-  //}
+  // unset username and password
 
   // feedburner_useragents
   $useragents = preg_replace('/^[|\s]+|[|\s]+$/m', '', $values['feedburner_useragents']);
@@ -645,4 +644,140 @@ function feedburner_autocomplete($cat) {
   }
   print drupal_to_js($keepers);
   exit();
+}
+
+/**
+ * Performs a request to the FeedBurner APIs and returns the result.
+ */
+function _feedburner_request_api($function, $args = array()) {
+  $request = new stdClass();
+
+  // This function shouldn't be called if SimpleXML is not available.
+  assert(_feedburner_can_api());
+
+  $functions = array(
+    'FindFeeds' => array('api' => 'management'),
+    'GetFeed' => array('api' => 'management'),
+    'AddFeed' => array('api' => 'management', 'method' => 'POST'),
+    'ModifyFeed' => array('api' => 'management', 'method' => 'POST'),
+    'DeleteFeed' => array('api' => 'management', 'method' => 'POST'),
+    'ResyncFeed' => array('api' => 'management', 'method' => 'POST'),
+    'GetFeedData' => array('api' => 'awareness'),
+    'GetItemData' => array('api' => 'awareness'),
+    'GetResyndicationData' => array('api' => 'awareness'),
+  );
+
+  if (!isset($functions[$function])) {
+    $request->error = 'Function not found';
+    return $request;
+  }
+
+  $request->function = $functions[$function];
+  $request->url = 'http://api.feedburner.com/' . $request->function['api'] . '/1.0/' . $function;
+  $request->method = isset($request->function['method']) ? $request->function['method'] : 'GET';
+  $request->headers = array();
+  $request->data = NULL;
+
+  if ($request->function['api'] == 'management') {
+    if (!isset($args['user']) && $auth = variable_get('feedburner_auth', FALSE)) {
+      $request->headers['Authorization'] = 'Basic ' . $auth;
+      unset($args['user']);
+      unset($args['password']);
+    }
+    //$request->url = 'http://api.feedburner.com/management/1.0/' . $function;
+  }
+  elseif ($request->function['api'] == 'awareness') {
+    //$request->url = 'http://api.feedburner.com/awareness/1.0/' . $function;
+  }
+
+  // Use secure request if PHP OpenSSL is available on any request
+  if (extension_loaded('openssl')) {
+    $request->url = str_replace('http', 'https', $request->url);
+  }
+
+  // Encode data and parameters depending on HTTP request method
+  if ($request->method == 'POST') {
+    $request->data = drupal_query_string_encode($args);
+  }
+  elseif ($request->method == 'GET') {
+    $request->url .= '?' . drupal_query_string_encode($args);
+  }
+
+  $response = drupal_http_request($request->url, $request->headers, $request->method, $request->data);
+
+  if (isset($response->data)) {
+    // Convert XML data to an object using SimpleXML so it can be easily manipulated
+    $response->data = simplexml_load_string($response->data);
+
+    if (isset($response->data->err)) {
+      // If an API error occurred, load the API error into the response error.
+      $response->error = (string) $response->data->err['msg'];
+
+      if (($response->error == 'Unknown user' || $response->error == 'Invalid password') && isset($request->headers['Authorization'])) {
+        // Unset authentication token if the error involves an incorrect username or password (and not using manual authorization)
+        //TODO Set Watchdog or error message
+        //watchdog('feedburner', t('FeedBurner API Error: %error', array('%error' => $response->error)), WATCHDOG_ERROR);
+        variable_set('feedburner_auth', FALSE);
+      }
+    }
+  }
+
+  return $response;
+}
+
+/**
+ * Retreive details about a FeedBurner feed.
+ */
+function _feedburner_get_feed_features($uri) {
+
+  $feed = new stdClass();
+  $feed->id = 0;
+  $feed->email = FALSE;
+  $feed->feedflare = FALSE;
+  $feed->awareness = FALSE;
+
+  // Scrape details from the actual feed
+  $request = drupal_http_request(_feedburner_construct_url($uri) . '?format=xml');
+
+  if (isset($request->error)) {
+    $feed->error = $request->error;
+    return $feed;
+  }
+  elseif ($request->code == 200) {
+    //if (!$feed->email && preg_match('%<feedburner:emailServiceId>(\d+)</feedburner:emailServiceId>%i', $request->data, $matches)) {
+    //  $feed->email = TRUE;
+    //  $feed->id = $matches[0];
+    //}
+    //
+    //if (!$feed->feedflare && preg_match('%</feedburner:feedFlare>%i', $request->data)) {
+    //  $feed->feedflare = TRUE;
+    //}
+    //
+    //if (!$feed->awareness && preg_match('%</feedburner:awareness>%i', $request->data)) {
+    //  $feed->awareness = TRUE;
+    //}
+
+    $features = array(
+      'email' => array('regex' => '%<feedburner:emailServiceId>(\d+)</feedburner:emailServiceId>%i', 'capture' => 'id'),
+      'feedflare' => array('regex' => '%</feedburner:feedFlare>%i'),
+      'awareness' => array('regex' => '%</feedburner:awareness>%i'),
+    );
+
+    foreach($features as $feature => $details) {
+      if (!$feed->$feature && preg_match($details['regex'], $request->data, $matches)) {
+        $feed->$feature = TRUE;
+        if (isset($details['capture'])) {
+          $feed->$details['capture'] = $matches[0];
+        }
+      }
+    }
+  }
+
+  //// Get details using the Feed Management API
+  //if (_feedburner_can_api(TRUE)) {
+  //  $request = _feedburner_request_api('GetFeed', array('uri' => $uri));
+  //  var_export($request);
+  //}
+
+  return $feed;
 }
