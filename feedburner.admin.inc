@@ -24,7 +24,7 @@ function feedburner_build_overview($cat) {
   foreach ($feeds as $feed) {
     $row = array();
     //$row[] = l($feed['path'] . (isset($feed['alias']) ? ' (' . $feed['alias'] . ')' : ''), $feed['path']);
-    $row[] = l((isset($feed['alias']) ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']), $feed['path']);
+    $row[] = l(($feed['alias'] != $feed['path'] ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']), $feed['path']);
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
       $row[] = l(t('Edit'), 'admin/build/feedburner/burn/' . $feed['path']);
@@ -418,7 +418,7 @@ function _feedburner_save_feed($path, $feedburner = NULL) {
 
 // TODO: Split into _get_feeds and _process_feeds?
 function _feedburner_get_feeds($cat = 'site', $options = array()) {
-  $default_options = array('sort' => TRUE, 'alias' => TRUE, 'feedburner' => TRUE, 'match' => FALSE);
+  $default_options = array('sort' => TRUE, 'alias' => TRUE, 'feedburner' => TRUE, 'match' => FALSE, 'key' => FALSE, 'fields' => array());
   $options = array_merge($default_options, $options);
   $feeds = array();
 
@@ -432,6 +432,9 @@ function _feedburner_get_feeds($cat = 'site', $options = array()) {
   }
 
   // TODO: Views integration
+  if (($cat == 'site' || $cat == 'all') && module_exists('views')) {
+    $views = db_query("SELECT display_options FROM {views_display} WHERE display_plugin = 'feed'");
+  }
   //if (preg_match('/all|views/', $cat) && module_exists('views')) {
   //  $result = db_query("SELECT url, page_title FROM {view_view} WHERE page_type = 'views_rss' OR page_type = 'views_podcast'");
   //  while ($view_details = db_fetch_object($result)) {
@@ -497,26 +500,16 @@ function _feedburner_get_feeds($cat = 'site', $options = array()) {
       continue;
     }
 
-    // Merge information
-    if (isset($keys[$feed['path']])) {
-      $index = $keys[$feed['path']];
-      $keepers[$index] = array_merge($feed, $keepers[$index]);
-      continue;
-    }
-
     // Lookup alias
     if ($options['alias']) {
-      $alias = drupal_get_path_alias($feed['path']);
-      if ($alias != $feed['path']) {
-        $feed['alias'] = $alias;
-      }
+      $feed['alias'] = drupal_get_path_alias($feed['path']);
     }
 
     // Match regular expressions
     if ($options['match']) {
       $regex = '/' . preg_quote($options['match'], '/') . '/i';
       $feed['value'] = FALSE;
-      foreach (array('path', 'alias', 'feedburner') as $field) {
+      foreach (array('path', 'alias', 'feedburner', $key) as $field) {
         if (isset($feed[$field]) && preg_match($regex, $feed[$field])) {
           $value = levenshtein($options['match'], $feed[$field]);
           if ($feed['value'] === FALSE || $value < $feed['value']) {
@@ -534,8 +527,16 @@ function _feedburner_get_feeds($cat = 'site', $options = array()) {
       $feed = array_merge($feed, $feedburner_feeds[$feed['path']]);
     }
 
+    // Merge information
+    if (isset($keys[$feed['path']])) {
+      $index = $keys[$feed['path']];
+      $keepers[$index] = array_merge($feed, $keepers[$index]);
+      continue;
+    }
+
+    // TODO: If $options['key'] is set, make associative array somehow
+    $keys[$feed['path']] = count($keepers);
     $keepers[] = $feed;
-    $keys[$feed['path']] = count($keepers) - 1;
   }
 
   $feeds = $keepers;
@@ -557,16 +558,20 @@ function _feedburner_get_feeds($cat = 'site', $options = array()) {
         return _feedburner_temp_sort_path($a[1], $b[1]);
       }
     }
+
+    // Need to pass the key variale inside these function declarations
+    $GLOBALS['feedburner_sort_key'] = $options['key'] ? $options['key'] : 'path';
     function _feedburner_temp_sort_fields($a, $b) {
       if (isset($a['value']) && isset($b['value']) && $a['value'] != $b['value']) {
         return $a['value'] > $b['value'];
       }
       else {
-        return _feedburner_temp_sort_path((isset($a['alias']) ? $a['alias'] : $a['path']), (isset($b['alias']) ? $b['alias'] : $b['path']));
+        return _feedburner_temp_sort_path($a[$GLOBALS['feedburner_sort_key']], $b[$GLOBALS['feedburner_sort_key']]);
       }
     }
 
     usort($feeds, '_feedburner_temp_sort_fields');
+    unset($GLOBALS['feedburner_sort_key']);
   }
 
   return $feeds;
@@ -639,7 +644,7 @@ function feedburner_autocomplete($cat) {
       $keepers[$feed['feedburner']] = $feed['feedburner'];
     }
     else {
-      $keepers[$feed['path']] = ($feed['alias'] ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']) . ($feed['description'] ? ' - ' . $feed['description'] : '');
+      $keepers[$feed['path']] = ($feed['alias'] != $feed['path'] ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']) . ($feed['description'] ? ' - ' . $feed['description'] : '');
     }
   }
   print drupal_to_js($keepers);
@@ -730,6 +735,18 @@ function _feedburner_request_api($function, $args = array()) {
  */
 function _feedburner_get_feed_features($uri) {
 
+  // If there is a cached result, return it instead of processing again
+  $feed_cache = cache_get('feedburner_feeds_details');
+  if (!$feed_cache) {
+    $feed_cache = array();
+  }
+  elseif (isset($feed_cache->data[$uri])) {
+    return $feed_cache->data[$uri];
+  }
+  else {
+    $feed_cache = $feed_cache->data;
+  }
+
   $feed = new stdClass();
   $feed->id = 0;
   $feed->email = FALSE;
@@ -763,11 +780,11 @@ function _feedburner_get_feed_features($uri) {
       'awareness' => array('regex' => '%</feedburner:awareness>%i'),
     );
 
-    foreach($features as $feature => $details) {
+    foreach ($features as $feature => $details) {
       if (!$feed->$feature && preg_match($details['regex'], $request->data, $matches)) {
         $feed->$feature = TRUE;
         if (isset($details['capture'])) {
-          $feed->$details['capture'] = $matches[0];
+          $feed->$details['capture'] = $matches[1];
         }
       }
     }
@@ -779,5 +796,38 @@ function _feedburner_get_feed_features($uri) {
   //  var_export($request);
   //}
 
+  // Cache results for quick retrieval
+  $feed_cache[$uri] = $feed;
+  cache_set('feedburner_feeds_details', $feed_cache, 'cache', CACHE_TEMPORARY);
+
   return $feed;
+}
+
+function feedburner_feedflare($feedflare) {
+  header('Content-type: application/xml');
+  echo '<!DOCTYPE FeedFlareUnit SYSTEM "FeedFlareUnit-1.0.dtd">';
+  switch ($feedflare) {
+    case 'comments':
+      if (isset($_GET['nid']) && is_numeric($_GET['nid'])) {
+        $node = node_load($_GET['nid']);
+        if ($node->comment != COMMENT_NODE_DISABLED) {
+          echo '<FeedFlare>
+  <Text>' . format_plural($node->comment_count, '@count comment', '@count comments') . '</Text>
+  <Link href="'. url('node/'. $node->nid, array('fragment' => 'comments', 'absolute' => TRUE)) .'"/>
+</FeedFlare>';
+
+        }
+      }
+      else {
+        echo '<FeedFlareUnit>
+  <Catalog>
+    <Title>Drupal comment count</Title>
+    <Description>Returns the number of comments for a Drupal node</Description>
+  </Catalog>
+  <DynamicFlare href="' . url('feedburner/feedflare/comments', array('absolute' => TRUE, 'query' => 'nid=${fn:substring-before(a:id, \' \')}')) . '" />
+</FeedFlareUnit>';
+      }
+
+  }
+  die();
 }
