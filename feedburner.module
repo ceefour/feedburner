@@ -219,7 +219,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     $form['feedburner_block_feedcount_feed'] = array(
       '#type' => 'select',
       '#title' => t('FeedBurner feed'),
-      '#default_value' => variable_get('feedburner_block_feedcount_feed', ''),
+      '#default_value' => variable_get('feedburner_block_feedcount_feed', 0),
       '#options' => $feeds,
     );
     return $form;
@@ -257,7 +257,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
         }
         return $block;
       case 2:
-        $feed = variable_get('feedburner_block_feedcount_feed', '');
+        $feed = variable_get('feedburner_block_feedcount_feed', 0);
         if (!empty($feed)) {
           $block['content'] = '<a href="http://feeds.feedburner.com/' . $feed . '"><img src="http://feeds.feedburner.com/~fc/' . $feed . '?bg=99CCFF&amp;fg=444444&amp;anim=0" height="26" width="88" style="border:0" alt="" /></a>';
         }
