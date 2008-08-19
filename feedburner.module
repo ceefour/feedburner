@@ -12,47 +12,15 @@
 function feedburner_help($path, $arg) {
   switch ($path) {
     case 'admin/help#feedburner':
-      // Return a line-break version of the module README
-      //$output = filter_filter('process', 1, NULL, file_get_contents(dirname(__FILE__) . '/README.txt'));
       $output .= _feedburner_blurb();
       return $output;
     case 'admin/settings/feedburner':
-      //$errors = feedburner_requirements('runtime');
-      //foreach ($errors as $error) {
-      //  drupal_set_message($error['description'], 'error');
-      //}
       $output = '<p>' . t('These are the settings for the FeedBurner module. Once you have everything set, check out your site\'s <a href="@link">FeedBurner feeds</a>.', array('@link' => url('admin/build/feedburner'))) . '</p>';
       return $output;
     case 'admin/build/feedburner':
       $output = '<p>' . t('This is the FeedBurner site feed redirection building page. Make sure to check out the <a href="@link">FeedBurner settings</a>.', array('@link' => url('admin/settings/feedburner'))) . '</p>';
       return $output;
   }
-}
-
-/**
- * Implementation of hook_requirements().
- */
-function feedburner_requirements($phase) {
-  $requirements = array();
-  if ($phase == 'runtime') {
-    if (!_feedburner_can_api()) {
-      $requirements['feedburner_simplexml'] = array(
-        'title' => t('FeedBurner module'),
-        'value' => t('SimpleXML not enabled'),
-        'severity' => REQUIREMENT_WARNING,
-        'description' => t('Some FeedBurner features require the SimpleXML PHP extension (not available for PHP4).'),
-      );
-    }
-    //elseif (!_feedburner_can_api(TRUE)) {
-    //  $requirements['feedburner_auth'] = array(
-    //    'title' => t('FeedBurner account'),
-    //    'value' => t('FeedBurner account not verified'),
-    //    'severity' => REQUIREMENT_WARNING,
-    //    'description' => t('Your FeedBurner account has not been verified.'),
-    //  );
-    //}
-  }
-  return $requirements;
 }
 
 /**
@@ -79,14 +47,14 @@ function feedburner_menu() {
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
-  foreach (_feedburner_get_feed_categories() as $key => $options) {
+  foreach (_feedburner_get_feed_categories() as $category => $options) {
     if (!isset($option['module']) || module_exists($options['module'])) {
-      $items['admin/build/feedburner/list/' . $key] = array(
-        'title' => ucfirst($key),
+      $items['admin/build/feedburner/list/' . $category] = array(
+        'title' => drupal_ucfirst($category),
         'type' => isset($options['default']) ? MENU_DEFAULT_LOCAL_TASK : MENU_LOCAL_TASK,
         'weight' => isset($options['default']) ? -10 : 0,
         'page callback' => 'feedburner_build_overview',
-        'page arguments' => array($key),
+        'page arguments' => array($category),
         'access arguments' => array('administer FeedBurner'),
         'file' => 'feedburner.admin.inc',
       );
@@ -128,6 +96,12 @@ function feedburner_menu() {
   //  'access arguments' => array('administer FeedBurner'),
   //  'file' => 'feedburner.admin.inc',
   //);
+  $items['feedburner/feedflare'] = array(
+    'page callback' => 'feedburner_feedflare',
+    'type' => MENU_CALLBACK,
+    'access callback' => TRUE,
+    'file' => 'feedburner.admin.inc',
+  );
   return $items;
 }
 
@@ -184,18 +158,19 @@ function feedburner_user($op, &$edit, &$account, $category = NULL) {
     return $form;
   }
   elseif ($op == 'validate' && isset($edit['feedburner_user_blog'])) {
+    // TODO: Matches slashes??
     if (preg_match('/[^\w-]/', $edit['feedburner_user_blog'])) {
       form_set_error('feedburner_user_blog', 'Invalid FeedBurner feed name');
     }
   }
   elseif ($op == 'update' && isset($edit['feedburner_user_blog'])) {
-    require_once drupal_get_path('module', 'feedburner') . '/feedburner.admin.inc';
+    module_load_include('inc', 'feedburner', 'feedburner.admin');
     $user_blog_url = 'blog/' . $account->uid . '/feed';
     _feedburner_save_feed($user_blog_url, $edit['feedburner_user_blog']);
     $edit['feedburner_user_blog'] = NULL;
   }
   elseif ($op == 'delete') {
-    require_once drupal_get_path('module', 'feedburner') . '/feedburner.admin.inc';
+    module_load_include('inc', 'feedburner', 'feedburner.admin');
     $user_blog_url = 'blog/' . $account->uid . '/feed';
     _feedburner_save_feed($user_blog_url);
   }
@@ -210,12 +185,31 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
     //$blocks[0]['pages'] = 'node/*';
     //$blocks[0]['visibility'] = 1;
+    $blocks[1]['info'] = t('FeedBurner E-mail Subscribe');
+    $blocks[1]['cache'] = BLOCK_CACHE_PER_PAGE;
     return $blocks;
   }
-  //elseif ($op == 'configure') {
-  //}
-  //elseif ($op == 'save') {
-  //}
+  elseif ($op == 'configure' && $delta == 1) {
+    module_load_include('inc', 'feedburner', 'feedburner.admin');
+    $feeds = array(0 => 'None (disabled)');
+    $result = db_query('SELECT DISTINCT feedburner FROM {feedburner} ORDER BY feedburner');
+    while ($feed = db_result($result)) {
+      $details = _feedburner_get_feed_features($feed);
+      if ($details->id) {
+        $feeds[$details->id] = $feed;
+      }
+    }
+    $form['feedburner_block_email_id'] = array(
+      '#type' => 'select',
+      '#title' => t('FeedBurner feed'),
+      '#default_value' => variable_get('feedburner_block_email_id', 0),
+      '#options' => $feeds,
+    );
+    return $form;
+  }
+  elseif ($op == 'save' && $delta == 1) {
+    variable_set('feedburner_block_email_id', (int) $edit['feedburner_block_email_id']);
+  }
   elseif ($op == 'view') {
     $block = array();
     switch ($delta) {
@@ -228,10 +222,23 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
           }
         }
         return $block;
+      case 1:
+        $id = variable_get('feedburner_block_email_id', 0);
+        if ($id) {
+          // TODO: Convert to Form API? or better containing divs?
+          $block['subject'] = t('Get E-mail Updates');
+          $block['content'] .= '<form action="http://www.feedburner.com/fb/a/emailverify" method="post" target="popupwindow" onsubmit="window.open(\'http://www.feedburner.com\', \'popupwindow\', \'scrollbars=yes,width=550,height=520\');return true;" id="feedburner-block-email-form">';
+          $block['content'] .= '<label for="feedburner-block-email-form-email">Enter your email address:</label>';
+          $block['content'] .= '<input type="text" size="15" name="email" id="feedburner-block-email-form-email" />';
+          $block['content'] .= '<input type="hidden" value="http://feeds.feedburner.com/~e?ffid=' . $id . '" name="url"/>';
+          $block['content'] .= '<input type="submit" value="Subscribe" class="form-submit" />';
+          $block['content'] .= '<p>Delivered by <a href="http://www.feedburner.com">FeedBurner</a></p>';
+          $block['content'] .= '</form>';
+        }
+        return $block;
     }
   }
 }
-
 
 /**
  * Check to see if the current path has a FeedBurner feed redirect, and perform
@@ -282,7 +289,7 @@ function _feedburner_construct_url($uri = '') {
  * Determines if we can use the FeedBurner API.
  */
 function _feedburner_can_api($valid_account = FALSE) {
-  return extension_loaded('SimpleXML') && function_exists('simplexml_load_string') && (!$valid_account || variable_get('feedburner_auth', FALSE));
+  return !variable_get('drupal_http_request_fails', FALSE) && extension_loaded('SimpleXML') && function_exists('simplexml_load_string') && (!$valid_account || variable_get('feedburner_auth', FALSE));
 }
 
 /*
