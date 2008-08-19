@@ -183,10 +183,12 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
   if ($op == 'list') {
     $blocks[0]['info'] = t('FeedBurner FeedFlare');
     $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
-    //$blocks[0]['pages'] = 'node/*';
-    //$blocks[0]['visibility'] = 1;
     $blocks[1]['info'] = t('FeedBurner E-mail Subscribe');
     $blocks[1]['cache'] = BLOCK_CACHE_PER_PAGE;
+    $blocks[2]['info'] = t('FeedBurner FeedCount');
+    $blocks[2]['cache'] = BLOCK_CACHE_GLOBAL;
+    $blocks[3]['info'] = t('FeedBurner Feeds');
+    $blocks[3]['cache'] = BLOCK_CACHE_GLOBAL;
     return $blocks;
   }
   elseif ($op == 'configure' && $delta == 1) {
@@ -204,11 +206,29 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
       '#title' => t('FeedBurner feed'),
       '#default_value' => variable_get('feedburner_block_email_id', 0),
       '#options' => $feeds,
+      '#description' => t('Only feeds with the email subscription feature verified can be selected.'),
+    );
+    return $form;
+  }
+  elseif ($op == 'configure' & $delta == 2) {
+    $feeds = array(0 => 'None (disabled)');
+    $result = db_query('SELECT DISTINCT feedburner FROM {feedburner} ORDER BY feedburner');
+    while ($feed = db_result($result)) {
+      $feeds[$feed] = $feed;
+    }
+    $form['feedburner_block_feedcount_feed'] = array(
+      '#type' => 'select',
+      '#title' => t('FeedBurner feed'),
+      '#default_value' => variable_get('feedburner_block_feedcount_feed', ''),
+      '#options' => $feeds,
     );
     return $form;
   }
   elseif ($op == 'save' && $delta == 1) {
     variable_set('feedburner_block_email_id', (int) $edit['feedburner_block_email_id']);
+  }
+  elseif ($op == 'save' && $delta == 2) {
+    variable_set('feedburner_block_feedcount_feed', $edit['feedburner_block_feedcount_feed']);
   }
   elseif ($op == 'view') {
     $block = array();
@@ -235,6 +255,24 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
           $block['content'] .= '<p>Delivered by <a href="http://www.feedburner.com">FeedBurner</a></p>';
           $block['content'] .= '</form>';
         }
+        return $block;
+      case 2:
+        $feed = variable_get('feedburner_block_feedcount_feed', '');
+        if (!empty($feed)) {
+          $block['content'] = '<a href="http://feeds.feedburner.com/' . $feed . '"><img src="http://feeds.feedburner.com/~fc/' . $feed . '?bg=99CCFF&amp;fg=444444&amp;anim=0" height="26" width="88" style="border:0" alt="" /></a>';
+        }
+        return $block;
+      case 3:
+        module_load_include('inc', 'feedburner', 'feedburner.admin');
+        $block['subject'] = variable_get('site_name', 'Drupal') . t(' Feeds');
+        $feeds = db_query("SELECT path, feedburner FROM {feedburner}");
+        //$block['content'] .= '<ul style="list-style-image: url(\'../../misc/feed.png\') !important;">';
+        $block['content'] = '<ul>';
+        while($feed = db_fetch_object($feeds)) {
+          $features = _feedburner_get_feed_features($feed->feedburner);
+          $block['content'] .= '<li>' . theme('image', 'misc/feed.png') . ' <a href="' . _feedburner_construct_url($feed->feedburner) . '">' . ($features->title ? $features->title : $feed->path) .'</a></li>';
+        }
+        $block['content'] .= '</ul>';
         return $block;
     }
   }

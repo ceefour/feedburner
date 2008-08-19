@@ -733,14 +733,14 @@ function _feedburner_request_api($function, $args = array()) {
 /**
  * Retreive details about a FeedBurner feed.
  */
-function _feedburner_get_feed_features($uri) {
+function _feedburner_get_feed_features($uri, $cache = TRUE) {
 
   // If there is a cached result, return it instead of processing again
   $feed_cache = cache_get('feedburner_feeds_details');
   if (!$feed_cache) {
     $feed_cache = array();
   }
-  elseif (isset($feed_cache->data[$uri])) {
+  elseif (isset($feed_cache->data[$uri]) && $cache) {
     return $feed_cache->data[$uri];
   }
   else {
@@ -752,6 +752,7 @@ function _feedburner_get_feed_features($uri) {
   $feed->email = FALSE;
   $feed->feedflare = FALSE;
   $feed->awareness = FALSE;
+  $feed->title = '';
 
   // Scrape details from the actual feed
   $request = drupal_http_request(_feedburner_construct_url($uri) . '?format=xml');
@@ -761,30 +762,23 @@ function _feedburner_get_feed_features($uri) {
     return $feed;
   }
   elseif ($request->code == 200) {
-    //if (!$feed->email && preg_match('%<feedburner:emailServiceId>(\d+)</feedburner:emailServiceId>%i', $request->data, $matches)) {
-    //  $feed->email = TRUE;
-    //  $feed->id = $matches[0];
-    //}
-    //
-    //if (!$feed->feedflare && preg_match('%</feedburner:feedFlare>%i', $request->data)) {
-    //  $feed->feedflare = TRUE;
-    //}
-    //
-    //if (!$feed->awareness && preg_match('%</feedburner:awareness>%i', $request->data)) {
-    //  $feed->awareness = TRUE;
-    //}
 
     $features = array(
-      'email' => array('regex' => '%<feedburner:emailServiceId>(\d+)</feedburner:emailServiceId>%i', 'capture' => 'id'),
+      'email' => array('regex' => '%</feedburner:emailServiceId>%i'),
+      'id' => array('regex' => '%<feedburner:emailServiceId>(\d+)</feedburner:emailServiceId>%i', 'capture' => TRUE),
       'feedflare' => array('regex' => '%</feedburner:feedFlare>%i'),
       'awareness' => array('regex' => '%</feedburner:awareness>%i'),
+      'title' => array('regex' => '%<title>(.*?)</title>%i', 'capture' => TRUE),
     );
 
     foreach ($features as $feature => $details) {
       if (!$feed->$feature && preg_match($details['regex'], $request->data, $matches)) {
-        $feed->$feature = TRUE;
+        var_export($matches); echo "\n\n";
         if (isset($details['capture'])) {
-          $feed->$details['capture'] = $matches[1];
+          $feed->$feature = $matches[1];
+        }
+        else {
+          $feed->$feature = TRUE;
         }
       }
     }
