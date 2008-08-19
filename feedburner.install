@@ -71,7 +71,7 @@ function feedburner_update_6000() {
   // Update from 5.x-0.5 version
   $old_feeds = variable_get('feedburner_feeds', array());
   foreach ($old_feeds as $path => $feedburner) {
-    $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES (" . $path . " , " . $feedburner . ")");
+    $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES ('" . $path . "', '" . $feedburner . "')");
   }
   variable_del('feedburner_feeds');
 
@@ -79,7 +79,7 @@ function feedburner_update_6000() {
   if (db_table_exists('feedburner_feeds')) {
     $old_feeds = db_query("SELECT local_uri, fb_uri FROM {feedburner_feeds}");
     while ($old_feed = db_fetch_object($old_feeds)) {
-      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES (" . $old_feed->local_uri . " , " . $old_feed->fb_uri . ")");
+      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES ('" . $old_feed->local_uri . "', '" . $old_feed->fb_uri . "')");
     }
     db_drop_table($ret, 'feedburner_feeds');
   }
@@ -105,4 +105,23 @@ function feedburner_uninstall() {
   while ($variable = db_fetch_object($variables)) {
     variable_del($variable->name);
   }
+}
+
+/**
+ * Implementation of hook_requirements().
+ */
+function feedburner_requirements($phase) {
+  $requirements = array();
+  $t = get_t();
+  if ($phase == 'runtime') {
+    if (!function_exists('simplexml_load_string')) {
+      $requirements['feedburner_simplexml'] = array(
+        'title' => $t('FeedBurner module'),
+        'value' => $t('SimpleXML not enabled'),
+        'severity' => REQUIREMENT_WARNING,
+        'description' => $t('Some FeedBurner features require the SimpleXML PHP extension (not available for PHP4).'),
+      );
+    }
+  }
+  return $requirements;
 }
