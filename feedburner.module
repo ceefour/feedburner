@@ -100,7 +100,6 @@ function feedburner_menu() {
     'page callback' => 'feedburner_feedflare',
     'type' => MENU_CALLBACK,
     'access callback' => TRUE,
-    'file' => 'feedburner.admin.inc',
   );
   return $items;
 }
@@ -268,7 +267,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
         $feeds = db_query("SELECT path, feedburner FROM {feedburner}");
         //$block['content'] .= '<ul style="list-style-image: url(\'../../misc/feed.png\') !important;">';
         $block['content'] = '<ul>';
-        while($feed = db_fetch_object($feeds)) {
+        while ($feed = db_fetch_object($feeds)) {
           $features = _feedburner_get_feed_features($feed->feedburner);
           $block['content'] .= '<li>' . theme('image', 'misc/feed.png') . ' <a href="' . _feedburner_construct_url($feed->feedburner) . '">' . ($features->title ? $features->title : $feed->path) .'</a></li>';
         }
@@ -387,4 +386,33 @@ function _feedburner_get_feedflare($nid, $node_type) {
  */
 function _feedburner_blurb() {
   return '<p style="text-align: center; font-size: smaller;">' . t('This module was developed by <a href="@link-dave">Dave Reid</a> with assistance from <a href="@link-feedburner">FeedBurner</a>.<br />Please consider <a href="@link-review">reviewing this module on drupalmodules.com</a> or <a href="@link-donate">donating to the developer\'s replacement laptop fund</a>.', array('@link-dave' => 'http://davereid.net/', '@link-feedburner' => 'http://www.feedburner.com/', '@link-review' => 'http://drupalmodules.com/module/feedburner', '@link-donate' => 'http://davereid.net/content/laptop-fund')) . '</p>';
+}
+
+function feedburner_feedflare($feedflare) {
+  header('Content-type: application/xml');
+  echo '<!DOCTYPE FeedFlareUnit SYSTEM "FeedFlareUnit-1.0.dtd">';
+  switch ($feedflare) {
+    case 'comments':
+      if (isset($_GET['nid']) && is_numeric($_GET['nid'])) {
+        $node = node_load($_GET['nid']);
+        if ($node->comment != COMMENT_NODE_DISABLED) {
+          echo '<FeedFlare>
+  <Text>' . format_plural($node->comment_count, '@count comment', '@count comments') . '</Text>
+  <Link href="'. url('node/'. $node->nid, array('fragment' => 'comments', 'absolute' => TRUE)) .'"/>
+</FeedFlare>';
+
+        }
+      }
+      else {
+        echo '<FeedFlareUnit>
+  <Catalog>
+    <Title>Drupal comment count</Title>
+    <Description>Returns the number of comments for a Drupal node</Description>
+  </Catalog>
+  <DynamicFlare href="' . url('feedburner/feedflare/comments', array('absolute' => TRUE, 'query' => 'nid=${fn:substring-before(a:id, \' \')}')) . '" />
+</FeedFlareUnit>';
+      }
+
+  }
+  exit();
 }

@@ -796,32 +796,3 @@ function _feedburner_get_feed_features($uri, $cache = TRUE) {
 
   return $feed;
 }
-
-function feedburner_feedflare($feedflare) {
-  header('Content-type: application/xml');
-  echo '<!DOCTYPE FeedFlareUnit SYSTEM "FeedFlareUnit-1.0.dtd">';
-  switch ($feedflare) {
-    case 'comments':
-      if (isset($_GET['nid']) && is_numeric($_GET['nid'])) {
-        $node = node_load($_GET['nid']);
-        if ($node->comment != COMMENT_NODE_DISABLED) {
-          echo '<FeedFlare>
-  <Text>' . format_plural($node->comment_count, '@count comment', '@count comments') . '</Text>
-  <Link href="'. url('node/'. $node->nid, array('fragment' => 'comments', 'absolute' => TRUE)) .'"/>
-</FeedFlare>';
-
-        }
-      }
-      else {
-        echo '<FeedFlareUnit>
-  <Catalog>
-    <Title>Drupal comment count</Title>
-    <Description>Returns the number of comments for a Drupal node</Description>
-  </Catalog>
-  <DynamicFlare href="' . url('feedburner/feedflare/comments', array('absolute' => TRUE, 'query' => 'nid=${fn:substring-before(a:id, \' \')}')) . '" />
-</FeedFlareUnit>';
-      }
-
-  }
-  die();
-}
