@@ -90,12 +90,6 @@ function feedburner_menu() {
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
-  //$items['admin/feedburner/verify'] = array(
-  //  'page callback' => '_feedburner_verify',
-  //  'type' => MENU_CALLBACK,
-  //  'access arguments' => array('administer FeedBurner'),
-  //  'file' => 'feedburner.admin.inc',
-  //);
   $items['feedburner/feedflare'] = array(
     'page callback' => 'feedburner_feedflare',
     'type' => MENU_CALLBACK,

@@ -158,13 +158,14 @@ function feedburner_burn_form() {
 }
 
 function feedburner_burn_form_validate($form, &$form_state) {
-  $path =& $form_state['values']['path'];
+  $path = $form_state['values']['path'];
   $path = drupal_get_normal_path($path);
-  $feedburner = $form_state['values']['feedburner'];
   $path_menu = menu_get_item($path);
   if (!valid_url($path) || !$path_menu || !$path_menu['access']) {
     form_set_error('path', t("The path '@link_path' is either invalid or you do not have access to it.", array('@link_path' => $path)));
   }
+
+  $feedburner = $form_state['values']['feedburner'];
   if (preg_match('/[^\w-]/', $feedburner)) {
     form_set_error('feedburner', 'Invalid FeedBurner feed name');
   }
@@ -482,7 +483,7 @@ function _feedburner_get_feeds($cat = 'site', $options = array()) {
   // TODO: Fetch FeedBurner feeds from FeedManagement API
   $feedburner_feeds = array();
   if ($cat == 'feedburner' || $options['feedburner']) {
-    $query = db_query("SELECT path, feedburner, verified FROM {feedburner}");
+    $query = db_query("SELECT path, feedburner FROM {feedburner}");
     while ($feed = db_fetch_array($query)) {
       if ($cat == 'all' || $cat == 'feedburner' || $cat == 'site') {
         $feeds[] = $feed;
@@ -575,63 +576,6 @@ function _feedburner_get_feeds($cat = 'site', $options = array()) {
   }
 
   return $feeds;
-}
-
-
-// TODO: CLEANUP AND OPTIMIZE!
-// TODO: Make this a callback instead of private function
-function _feedburner_verify_feed($local, $feedburner) {
-  if (!variable_get('drupal_http_request_fails', FALSE)) {
-    for ($i = 0; $i < 3; $i++) {
-      $url = NULL;
-      $request = NULL;
-      $message_start = NULL;
-      $results = array(NULL, NULL, NULL, time());
-      switch ($i) {
-        case 0:
-          $url = url($local, array('absolute' => TRUE, 'query' => 'redirect=no'));
-          $message_start = t('Local feed ');
-          break;
-        case 1:
-          $url = _feedburner_construct_url($feedburner);
-          $message_start = t('FeedBurner feed ');
-          break;
-        case 2:
-          $url = url($local, array('absolute' => TRUE));
-          $message_start = t('Local feed redirection for ');
-          break;
-      }
-
-      $request = drupal_http_request($url);
-      unset($request->data);
-
-      switch ($i) {
-        case 0:
-          $url = url($local, array('absolute' => TRUE));
-        case 1:
-          $results[$i] = (isset($request->code) && $request->code == '200'
-          && is_array($request->headers) && preg_match('/rss|atom|xml/', $request->headers['Content-Type']));
-          break;
-        case 2:
-          $results[$i] = (isset($request->code)
-            && $request->code == variable_get('feedburner_redirect_status', 307)
-            && isset($request->redirect_code) && $request->redirect_code == '200'
-            && isset($request->redirect_url) && $request->redirect_url == _feedburner_construct_url($feedburner));
-          break;
-      }
-
-      //if ($result[$i]) {
-      //  drupal_set_message($message_start . t('<a href="@link">@link</a> verified.', array('@link' => $url)));
-      //}
-      if (!$results[$i]) {
-        $results[3] = 0;
-        drupal_set_message($message_start . t('<a href="@link">@link</a> failed verification. @error', array('@link' => $url, '@error' => $request->error)), 'error');
-        break;
-      }
-    }
-  }
-
-  //db_query("UPDATE {feedburner} SET verified = %d WHERE path = '%s' AND feedburner = '%s'", $results[3], $local, $feedburner);
 }
 
 function feedburner_autocomplete($cat) {
