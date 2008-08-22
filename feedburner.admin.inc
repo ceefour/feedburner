@@ -166,7 +166,7 @@ function feedburner_burn_form_validate($form, &$form_state) {
   }
 
   $feedburner = $form_state['values']['feedburner'];
-  if (preg_match('/[^\w-]/', $feedburner)) {
+  if (preg_match('%[^\w-/]%i', $feedburner)) {
     form_set_error('feedburner', 'Invalid FeedBurner feed name');
   }
 }
