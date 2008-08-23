@@ -166,7 +166,7 @@ function feedburner_burn_form_validate($form, &$form_state) {
   }
 
   $feedburner = $form_state['values']['feedburner'];
-  if (preg_match('%[^\w-/]%i', $feedburner)) {
+  if (preg_match('%[^\w-/]%', $feedburner)) {
     form_set_error('feedburner', 'Invalid FeedBurner feed name');
   }
 }
@@ -406,12 +406,11 @@ function _feedburner_save_feed($path, $feedburner = NULL) {
   else {
     if (!empty($current) && $current != $feedburner) {
       db_query("UPDATE {feedburner} SET feedburner = '%s' WHERE path = '%s'", $feedburner, $path);
-      _feedburner_verify_feed($path, $feedburner);
     }
     elseif (empty($current)) {
       db_query("INSERT INTO {feedburner} (path, feedburner) VALUES ('%s', '%s')", $path, $feedburner);
-      _feedburner_verify_feed($path, $feedburner);
     }
+    // TODO: Check verification of feed?
   }
   return (db_affected_rows() != 0);
 }

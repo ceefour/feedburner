@@ -152,7 +152,7 @@ function feedburner_user($op, &$edit, &$account, $category = NULL) {
   }
   elseif ($op == 'validate' && isset($edit['feedburner_user_blog'])) {
     // TODO: Matches slashes??
-    if (preg_match('/[^\w-]/', $edit['feedburner_user_blog'])) {
+    if (preg_match('%[^\w-/]%', $edit['feedburner_user_blog'])) {
       form_set_error('feedburner_user_blog', 'Invalid FeedBurner feed name');
     }
   }
@@ -240,13 +240,15 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
         if ($id) {
           // TODO: Convert to Form API? or better containing divs?
           $block['subject'] = t('Get E-mail Updates');
-          $block['content'] .= '<form action="http://www.feedburner.com/fb/a/emailverify" method="post" target="popupwindow" onsubmit="window.open(\'http://www.feedburner.com\', \'popupwindow\', \'scrollbars=yes,width=550,height=520\');return true;" id="feedburner-block-email-form">';
+          $block['content'] .= '<form action="http://www.feedburner.com/fb/a/emailverify" method="post" target="popupwindow" onsubmit="window.open(\'http://www.feedburner.com\', \'popupwindow\', \'scrollbars=yes,width=550,height=520\');return true;" id="feedburner-block-email-form"><div class="container-inline" id="feedburner-block-email">';
+          $block['content'] .= '<div class="form-item">';
           $block['content'] .= '<label for="feedburner-block-email-form-email">Enter your email address:</label>';
           $block['content'] .= '<input type="text" size="15" name="email" id="feedburner-block-email-form-email" />';
+          $block['content'] .= '</div>';
           $block['content'] .= '<input type="hidden" value="http://feeds.feedburner.com/~e?ffid=' . $id . '" name="url"/>';
           $block['content'] .= '<input type="submit" value="Subscribe" class="form-submit" />';
           $block['content'] .= '<p>Delivered by <a href="http://www.feedburner.com">FeedBurner</a></p>';
-          $block['content'] .= '</form>';
+          $block['content'] .= '</div></form>';
         }
         return $block;
       case 2:
