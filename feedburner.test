@@ -52,6 +52,33 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->drupalGet('rss.xml');
     $this->assertText('Local Feed');
     $this->assertEqual($this->getUrl(), url('rss.xml', array('absolute' => TRUE)), t('Feed was not directed.'));
+
+    // Unset the path alias (causes test errors later).
+    path_set_alias('rss.xml');
+  }
+
+  /**
+   * Test redirection with cache enabled.
+   */
+  function testFeedCachedRedirection() {
+    // Enable normal caching and request the page to get it cached.
+    variable_set('cache', CACHE_NORMAL);
+    $this->drupalGet('rss.xml');
+    $this->assertTrue(cache_get(url('rss.xml', array('absolute' => TRUE)), 'cache_page'), t('Page has been cached.'));
+
+    // Enable redirection for feed.
+    _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
+
+    // Test redirection with normal caching.
+    $this->drupalGet('rss.xml');
+    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected with normal caching enabled.'));
+
+    // Enable aggressive caching.
+    variable_set('cache', CACHE_AGGRESSIVE);
+
+    // Test redirection with aggressive caching.
+    $this->drupalGet('rss.xml');
+    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected with aggressive caching enabled.'));
   }
 
   /**
@@ -88,15 +115,43 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->assertEqual($this->getUrl(), url("blog/{$blog_user->uid}/feed", array('absolute' => TRUE)), t('Blog feed not redirected.'));
 
     // Test that a user without permission cannot access the form field.
-    $no_blog_user = $this->drupalCreateUser(array('add FeedBurner feed to own blog'));
-    $this->drupalLogin($no_blog_user);
-    $this->drupalGet("user/{$no_blog_user->uid}/edit");
+    $this->drupalSetPermissions(end($blog_user->roles), array('add FeedBurner feed to own blog'));
+    $this->drupalGet("user/{$blog_user->uid}/edit");
     $this->assertNoFieldByName('feedburner_feedburner');
   }
 
   /*function testFeedFlare() {
 
   }*/
+
+  /**
+   * Implementation of core patch #300993 for setting permissions.
+   * @link http://drupal.org/node/300993
+   */
+  protected function drupalSetPermissions($role, $permissions = array()) {
+    $rid = db_result(db_query("SELECT rid FROM {role} WHERE name = '%s'", $role));
+    if ($rid === FALSE) {
+      $this->fail(t('Role %role not found.', array('%role' => $role)));
+      return FALSE;
+    }
+
+    /*if (!$this->checkPermissions($permissions)) {
+      return FALSE;
+    }*/
+
+    // Clear permissions for role.
+    db_query("DELETE FROM {permission} WHERE rid = %d", $rid);
+
+    if (!empty($permissions)) {
+      db_query("INSERT INTO {permission} (rid, perm) VALUES (%d, '%s')", $rid, implode(', ', $permissions));
+    }
+
+    $perm = db_result(db_query("SELECT perm FROM {permission} WHERE rid = %d", $rid));
+    $result = count(explode(', ', $perm)) == count($permissions);
+    $this->assertTrue($result, t('Created permissions: @perms', array('@perms' => implode(', ', $permissions))), t('Role'));
+
+    return $result;
+  }
 }
 
 /**
