@@ -19,48 +19,84 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
   }
 
   function setUp() {
-    parent::setUp('feedburner', 'blog');
+    parent::setUp('feedburner', 'blog', 'path');
+
+    // Create a test node that will be shown on the RSS feed.
+    $this->drupalCreateNode(array('type' => 'blog', 'promote' => 1, 'title' => 'Local Feed'));
   }
 
   /**
-   * Test FeedBurner with a user blog's feed.
+   * Test basic feed redirection and user agent matching.
    */
-  function testBlogFeed() {
-    $this->admin_user = $this->drupalCreateUser(array('create blog entries', 'add FeedBurner feed to own blog'));
-    $this->drupalLogin($this->admin_user);
+  function testFeedRedirection() {
+    // Save redirection and test that path is redirected.
+    _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
+    $this->drupalGet('rss.xml');
+    $this->assertText('FeedBurner Feed');
+    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected'));
+
+    // Set a path alias and test that alias is redirected.
+    path_set_alias('rss.xml', 'feed');
+    $this->drupalGet('feed');
+    $this->assertText('FeedBurner Feed');
+    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected on path alias.'));
+
+    // Test redirection with a useragent that should not be redirected.
+    variable_set('feedburner_useragents', '/simpletest/i');
+    $this->drupalGet('rss.xml');
+    $this->assertText('Local Feed');
+    $this->assertEqual($this->getUrl(), url('rss.xml', array('absolute' => TRUE)), t('Feed was not directed with matching user agent.'));
+
+    // Remove redirection and test that path is not redirected.
+    _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => ''));
+    $this->drupalGet('rss.xml');
+    $this->assertText('Local Feed');
+    $this->assertEqual($this->getUrl(), url('rss.xml', array('absolute' => TRUE)), t('Feed was not directed.'));
+  }
+
+  /**
+   * Test user blog feed redirection.
+   */
+  function testBlogFeedRedirection() {
+    $blog_user = $this->drupalCreateUser(array('create blog entries', 'add FeedBurner feed to own blog'));
+    $this->drupalLogin($blog_user);
 
     // Add an invalid blog feed redirection.
     $values = array('feedburner_feedburner' => 'invalid_feed!');
-    $this->drupalPost("user/{$this->admin_user->uid}/edit", $values, t('Save'));
+    $this->drupalPost("user/{$blog_user->uid}/edit", $values, t('Save'));
     $this->assertText(t('Invalid FeedBurner feed name.'), t('Invalid FeedBurner feed name caught.'));
 
     // Add a valid blog feed redirection.
-    // @todo Find a steady test feed. example? feedburner-test? google?
-    $values = array('feedburner_feedburner' => 'test');
-    $this->drupalPost("user/{$this->admin_user->uid}/edit", $values, t('Save'));
+    $values = array('feedburner_feedburner' => 'example-feed');
+    $this->drupalPost("user/{$blog_user->uid}/edit", $values, t('Save'));
     $this->assertText(t('The changes have been saved.'), t('Blog feed updated.'));
 
     // Test that the blog feed is now redirected.
-    $this->drupalGet("blog/{$this->admin_user->uid}/feed");
+    $this->drupalGet("blog/{$blog_user->uid}/feed");
     //$this->assertResponse(307);
+    $this->assertText('FeedBurner Feed');
     $this->assertEqual($this->getUrl(), _feedburner_construct_url($values['feedburner_feedburner']), t('Blog feed redirected.'));
 
     // Remove the blog feed redirection.
     $values = array('feedburner_feedburner' => '');
-    $this->drupalPost("user/{$this->admin_user->uid}/edit", $values, t('Save'));
+    $this->drupalPost("user/{$blog_user->uid}/edit", $values, t('Save'));
     $this->assertText(t('The changes have been saved.'), t('Blog feed updated to blank value.'));
 
     // Test that the blog feed is no longer redirected.
-    $this->drupalGet("blog/{$this->admin_user->uid}/feed");
+    $this->drupalGet("blog/{$blog_user->uid}/feed");
     //$this->assertResponse(200);
-    $this->assertEqual($this->getUrl(), url("blog/{$this->admin_user->uid}/feed", array('absolute' => TRUE)), t('Blog feed not redirected.'));
+    $this->assertEqual($this->getUrl(), url("blog/{$blog_user->uid}/feed", array('absolute' => TRUE)), t('Blog feed not redirected.'));
 
     // Test that a user without permission cannot access the form field.
-    $normal_user = $this->drupalCreateUser(array('create blog entries'));
-    $this->drupalLogin($normal_user);
-    $this->drupalGet("user/{$normal_user->uid}/edit");
+    $no_blog_user = $this->drupalCreateUser(array('add FeedBurner feed to own blog'));
+    $this->drupalLogin($no_blog_user);
+    $this->drupalGet("user/{$no_blog_user->uid}/edit");
     $this->assertNoFieldByName('feedburner_feedburner');
   }
+
+  /*function testFeedFlare() {
+
+  }*/
 }
 
 /**
@@ -78,4 +114,20 @@ class FeedBurnerAdminTestCase extends DrupalWebTestCase {
   function setUp() {
     parent::setUp('feedburner');
   }
+
+  /*function testViewsIntegration() {
+
+  }*/
+
+  /*function testBlocks() {
+
+  }*/
+
+  /*function testBuildInterface() {
+
+  }*/
+
+  /*function testSettingsInterface() {
+
+  }*/
 }
