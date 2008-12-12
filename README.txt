@@ -61,8 +61,7 @@ A: There are two options:
       as a 'Personal FeedFlare':
       http://pathtoyourdrupalsite.com/feedburner/feedflare/comments
 
-Q: Links or images in my FeedBurner feed aren't working! How can I convert
-   them to absolute URLs?
+Q: Links or images in my FeedBurner feed aren't working!
 A: You will need to convert those relative URLs ('images/mypic.jpg') to absolute
    URLs ('http://mysite/images/mypic.jpg'). I highly recommend the Pathologic
    module (http://drupal.org/project/pathologic) for exactly this problem.
@@ -72,11 +71,11 @@ KNOWN ISSUES
 ------------
 
 - FCKeditor module versions before 6.x-1.3-rc2 or 5.x-2.2-rc2 will add unwanted
-  HTML formatting to the 'Allowed Useragents' textarea in the 'Advanced'
-  settings in admin/settings/feedburner. This extra formatting causes unexpected
+  HTML to the 'Allowed Useragents' field in the advanced 'Advanced settings'
+  section of admin/settings/feedburner. This extra formatting causes unexpected
   errors. To fix this issue, please update to the latest version of the
   FCKeditor module and make sure to go to admin/settings/feedburner and set the
-  value of the 'Allowed Useragents' textarea to the following:
+  value of the 'Allowed Useragents' field to the following (one on each line):
     feedburner
     feedvalidator
 
