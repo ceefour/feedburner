@@ -9,7 +9,7 @@ CONTENTS OF THIS FILE
  * Frequently Asked Questions (FAQ)
  * Known Issues
  * More Information
- * How Can I Contribute?
+ * How Can You Contribute?
 
 
 INTRODUCTION
@@ -94,7 +94,7 @@ MORE INFORMATION
   FeedBurner module at http://support.bryght.com/adminguide/feedburner.
 
 
-HOW CAN I CONTRIBUTE?
+HOW CAN YOU CONTRIBUTE?
 ---------------------
 
 - Write a review for this module at drupalmodules.com.
