@@ -716,7 +716,6 @@ function _feedburner_get_feed_features($uri, $cache = TRUE) {
 
     foreach ($features as $feature => $details) {
       if (!$feed->$feature && preg_match($details['regex'], $request->data, $matches)) {
-        var_export($matches); echo "\n\n";
         if (isset($details['capture'])) {
           $feed->$feature = $matches[1];
         }
