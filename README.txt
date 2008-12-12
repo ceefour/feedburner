@@ -4,10 +4,12 @@ CONTENTS OF THIS FILE
 ---------------------
 
  * Introduction
- * Requirements
+ * Optional Requirements
  * Installation
  * Frequently Asked Questions (FAQ)
+ * Known Issues
  * More Information
+ * How Can I Contribute?
 
 
 INTRODUCTION
@@ -15,26 +17,36 @@ INTRODUCTION
 
 Current Maintainer: Dave Reid <dave@davereid.net>
 
+Integrates Drupal with the services provided by FeedBurner. Currently this
+module provides the means to redirect requests for your site's feeds to
+user-specified/created FeedBurner feeds. Special user agents, like FeedBurner
+and Feed Validator (this can be customized) are still allowed access to the
+direct feeds so there is no need for any special .htaccess hacking.
 
-REQUIREMENTS
-------------
 
- * A valid Drupal installation
- * Optional: PHP 5 for more advanced features
- * Optional: Valid HTTP connections
- * Optional: A valid FeedBurner account
+OPTIONAL REQUIREMENTS
+---------------------
+
+ * PHP 5 for more advanced features
+ * Ability to make HTTP connections from your server
+ * Valid FeedBurner (or Google FeedBurner) account
 
 
 INSTALLATION
 ------------
 
-See http://drupal.org/node/70151
+See http://drupal.org/getting-started/5/install-contrib for instructions on
+how to install or update Drupal modules.
+
+Once FeedBurner is installed and enabled, you can configure settings at
+admin/settings/feedburner and start burning your site feeds at
+admin/build/feedburner.
 
 
 FREQUENTLY ASKED QUESTIONS (FAQ)
 --------------------------------
 
-Q: Does this module work with feeds burnt with a Google FeedBurner account?
+Q: Does this module work with feeds with a Google FeedBurner account?
 A: Yes it does! All you need to do is go to the module settings page
    (admin/settings/feedburner) and under the 'Advanced Settings' area, change
    the MyBrand domain to 'feedproxy.google.com'.
@@ -49,6 +61,25 @@ A: There are two options:
       as a 'Personal FeedFlare':
       http://pathtoyourdrupalsite.com/feedburner/feedflare/comments
 
+Q: Links or images in my FeedBurner feed aren't working! How can I convert
+   them to absolute URLs?
+A: You will need to convert those relative URLs ('images/mypic.jpg') to absolute
+   URLs ('http://mysite/images/mypic.jpg'). I highly recommend the Pathologic
+   module (http://drupal.org/project/pathologic) for exactly this problem.
+
+
+KNOWN ISSUES
+------------
+
+- FCKeditor module versions before 6.x-1.3-rc2 or 5.x-2.2-rc2 will add unwanted
+  HTML formatting to the 'Allowed Useragents' textarea in the 'Advanced'
+  settings in admin/settings/feedburner. This extra formatting causes unexpected
+  errors. To fix this issue, please update to the latest version of the
+  FCKeditor module and make sure to go to admin/settings/feedburner and set the
+  value of the 'Allowed Useragents' textarea to the following:
+    feedburner
+    feedvalidator
+
 
 MORE INFORMATION
 ----------------
@@ -61,3 +92,22 @@ MORE INFORMATION
 
 - The Bryght team has put up a very nice guide and screencast about using the
   FeedBurner module at http://support.bryght.com/adminguide/feedburner.
+
+
+HOW CAN I CONTRIBUTE?
+---------------------
+
+- Write a review for this module at drupalmodules.com.
+  http://drupalmodules.com/module/feedburner
+
+- Help translate this module on launchpad.net.
+  https://translations.launchpad.net/drupal-feedburner
+
+- Donate to the maintainer's replacement laptop fund to help keep development
+  active. http://blog.davereid.net/content/laptop-fund
+
+- Report any bugs, feature requests, etc. in the issue tracker.
+  http://drupal.org/project/issues/feedburner
+
+- Contact the maintainer with any comments, questions, or feedback.
+  http://davereid.net/contact
