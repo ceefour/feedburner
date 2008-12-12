@@ -1,0 +1,81 @@
+<?php
+// $Id$
+
+/**
+ * @file
+ * Unit tests for the Feed Burner module.
+ */
+
+/**
+ * Test basic functionality.
+ */
+class FeedBurnerTestCase extends DrupalWebTestCase {
+  function getInfo() {
+    return array(
+      'name' => t('FeedBurner functionality'),
+      'description' => t('Test basic FeedBurner module functionality.'),
+      'group' => t('FeedBurner'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('feedburner', 'blog');
+  }
+
+  /**
+   * Test FeedBurner with a user blog's feed.
+   */
+  function testBlogFeed() {
+    $this->admin_user = $this->drupalCreateUser(array('create blog entries', 'add FeedBurner feed to own blog'));
+    $this->drupalLogin($this->admin_user);
+
+    // Add an invalid blog feed redirection.
+    $values = array('feedburner_feedburner' => 'invalid_feed!');
+    $this->drupalPost("user/{$this->admin_user->uid}/edit", $values, t('Save'));
+    $this->assertText(t('Invalid FeedBurner feed name.'), t('Invalid FeedBurner feed name caught.'));
+
+    // Add a valid blog feed redirection.
+    // @todo Find a steady test feed. example? feedburner-test? google?
+    $values = array('feedburner_feedburner' => 'test');
+    $this->drupalPost("user/{$this->admin_user->uid}/edit", $values, t('Save'));
+    $this->assertText(t('The changes have been saved.'), t('Blog feed updated.'));
+
+    // Test that the blog feed is now redirected.
+    $this->drupalGet("blog/{$this->admin_user->uid}/feed");
+    //$this->assertResponse(307);
+    $this->assertEqual($this->getUrl(), _feedburner_construct_url($values['feedburner_feedburner']), t('Blog feed redirected.'));
+
+    // Remove the blog feed redirection.
+    $values = array('feedburner_feedburner' => '');
+    $this->drupalPost("user/{$this->admin_user->uid}/edit", $values, t('Save'));
+    $this->assertText(t('The changes have been saved.'), t('Blog feed updated to blank value.'));
+
+    // Test that the blog feed is no longer redirected.
+    $this->drupalGet("blog/{$this->admin_user->uid}/feed");
+    //$this->assertResponse(200);
+    $this->assertEqual($this->getUrl(), url("blog/{$this->admin_user->uid}/feed", array('absolute' => TRUE)), t('Blog feed not redirected.'));
+
+    // Test that a user without permission cannot access the form field.
+    $normal_user = $this->drupalCreateUser(array('create blog entries'));
+    $this->drupalLogin($normal_user);
+    $this->drupalGet("user/{$normal_user->uid}/edit");
+    $this->assertNoFieldByName('feedburner_feedburner');
+  }
+}
+
+/**
+ * Test administration functionality.
+ */
+class FeedBurnerAdminTestCase extends DrupalWebTestCase {
+  function getInfo() {
+    return array(
+      'name' => t('FeedBurner administration'),
+      'description' => t('Test FeedBurner module administration.'),
+      'group' => t('FeedBurner'),
+    );
+  }
+
+  function setUp() {
+    parent::setUp('feedburner');
+  }
+}
