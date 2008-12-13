@@ -31,27 +31,22 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
   function testFeedRedirection() {
     // Save redirection and test that path is redirected.
     _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
-    $this->drupalGet('rss.xml');
+    $this->assertRedirected('rss.xml', t('Feed was redirected.'));
     $this->assertText('FeedBurner Feed');
-    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected'));
+    //$this->assertText('This feed was created for testing the Drupal FeedBurner module.');
 
     // Set a path alias and test that alias is redirected.
     path_set_alias('rss.xml', 'feed');
-    $this->drupalGet('feed');
-    $this->assertText('FeedBurner Feed');
-    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected on path alias.'));
+    $this->assertRedirected('feed', t('Feed was redirected on path alias.'));
 
     // Test redirection with a useragent that should not be redirected.
     variable_set('feedburner_useragents', '/simpletest/i');
-    $this->drupalGet('rss.xml');
+    $this->assertNotRedirected('rss.xml', t('Feed was not directed with matching user agent.'));
     $this->assertText('Local Feed');
-    $this->assertEqual($this->getUrl(), url('rss.xml', array('absolute' => TRUE)), t('Feed was not directed with matching user agent.'));
 
     // Remove redirection and test that path is not redirected.
     _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => ''));
-    $this->drupalGet('rss.xml');
-    $this->assertText('Local Feed');
-    $this->assertEqual($this->getUrl(), url('rss.xml', array('absolute' => TRUE)), t('Feed was not directed.'));
+    $this->assertNotRedirected('rss.xml', t('Feed was not directed.'));
 
     // Unset the path alias (causes test errors later).
     path_set_alias('rss.xml');
@@ -70,17 +65,15 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
 
     // Test redirection with normal caching.
-    $this->drupalGet('rss.xml');
-    $this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected with normal caching enabled.'));
+    $this->assertRedirected('rss.xml', t('Feed was redirected with normal caching enabled.'));
 
     // Enable aggressive caching.
     variable_set('cache', CACHE_AGGRESSIVE);
 
     // Test redirection with aggressive caching.
-    // @todo Switch this if I ever get aggressive caching redirection enabled.
-    $this->drupalGet('rss.xml');
-    $this->assertEqual($this->getUrl(), url('rss.xml', array('absolute' => TRUE)), t('Feed was not redirected with aggressive caching enabled.'));
-    //$this->assertEqual($this->getUrl(), _feedburner_construct_url('example-feed'), t('Feed was redirected with aggressive caching enabled.'));
+    // @todo Switch to assertRedirected if I ever get aggressive caching redirection enabled.
+    $this->assertNotRedirected('rss.xml', t('Feed was not redirected with aggressive caching enabled.'));
+    //$this->assertRedirected('rss.xml', t('Feed was redirected with aggressive caching enabled.'));
   }
 
   /**
@@ -101,10 +94,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->assertText(t('The changes have been saved.'), t('Blog feed updated.'));
 
     // Test that the blog feed is now redirected.
-    $this->drupalGet("blog/{$blog_user->uid}/feed");
-    //$this->assertResponse(307);
-    $this->assertText('FeedBurner Feed');
-    $this->assertEqual($this->getUrl(), _feedburner_construct_url($values['feedburner_feedburner']), t('Blog feed redirected.'));
+    $this->assertRedirected("blog/{$blog_user->uid}/feed", t('Blog feed redirected.'));
 
     // Remove the blog feed redirection.
     $values = array('feedburner_feedburner' => '');
@@ -112,9 +102,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->assertText(t('The changes have been saved.'), t('Blog feed updated to blank value.'));
 
     // Test that the blog feed is no longer redirected.
-    $this->drupalGet("blog/{$blog_user->uid}/feed");
-    //$this->assertResponse(200);
-    $this->assertEqual($this->getUrl(), url("blog/{$blog_user->uid}/feed", array('absolute' => TRUE)), t('Blog feed not redirected.'));
+    $this->assertNotRedirected("blog/{$blog_user->uid}/feed", t('Blog feed not redirected.'));
 
     // Test that a user without permission cannot access the form field.
     $no_blog_user = $this->drupalCreateUser(array('add FeedBurner feed to own blog'));
@@ -126,6 +114,16 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
   /*function testFeedFlare() {
 
   }*/
+
+  private function assertRedirected($url, $message, $feedburner = 'example-feed') {
+    $this->drupalGet($url);
+    $this->assertEqual($this->getUrl(), _feedburner_construct_url($feedburner), $message);
+  }
+
+  private function assertNotRedirected($url, $message) {
+    $this->drupalGet($url);
+    $this->assertEqual($this->getUrl(), url($url, array('absolute' => TRUE)), $message);
+  }
 }
 
 /**
