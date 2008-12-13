@@ -22,7 +22,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     parent::setUp('feedburner', 'blog', 'path');
 
     // Create a test node that will be shown on the RSS feed.
-    $this->drupalCreateNode(array('type' => 'blog', 'promote' => 1, 'title' => 'Local Feed'));
+    $this->drupalCreateNode(array('type' => 'blog', 'promote' => 1, 'title' => 'Local feed'));
   }
 
   /**
@@ -32,8 +32,8 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     // Save redirection and test that path is redirected.
     _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
     $this->assertRedirected('rss.xml', t('Feed was redirected.'));
-    $this->assertText('FeedBurner Feed');
-    //$this->assertText('This feed was created for testing the Drupal FeedBurner module.');
+    $this->assertText('FeedBurner feed');
+    // $this->assertText('This feed was created for testing the Drupal FeedBurner module.');
 
     // Set a path alias and test that alias is redirected.
     path_set_alias('rss.xml', 'feed');
@@ -42,7 +42,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     // Test redirection with a useragent that should not be redirected.
     variable_set('feedburner_useragents', '/simpletest/i');
     $this->assertNotRedirected('rss.xml', t('Feed was not directed with matching user agent.'));
-    $this->assertText('Local Feed');
+    $this->assertText('Local feed');
 
     // Remove redirection and test that path is not redirected.
     _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => ''));
@@ -73,7 +73,6 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     // Test redirection with aggressive caching.
     // @todo Switch to assertRedirected if I ever get aggressive caching redirection enabled.
     $this->assertNotRedirected('rss.xml', t('Feed was not redirected with aggressive caching enabled.'));
-    //$this->assertRedirected('rss.xml', t('Feed was redirected with aggressive caching enabled.'));
   }
 
   /**
@@ -111,7 +110,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->assertNoFieldByName('feedburner_feedburner');
   }
 
-  /*function testFeedFlare() {
+  /* function testFeedFlare() {
 
   }*/
 
@@ -142,19 +141,19 @@ class FeedBurnerAdminTestCase extends DrupalWebTestCase {
     parent::setUp('feedburner');
   }
 
-  /*function testViewsIntegration() {
+  /* function testViewsIntegration() {
 
   }*/
 
-  /*function testBlocks() {
+  /* function testBlocks() {
 
   }*/
 
-  /*function testBuildInterface() {
+  /* function testBuildInterface() {
 
   }*/
 
-  /*function testSettingsInterface() {
+  /* function testSettingsInterface() {
 
   }*/
 }
