@@ -1,6 +1,11 @@
 <?php
 // $Id$
 
+/**
+ * @file
+ * Page callback file for the feedburner module.
+ */
+
 function feedburner_feedflare($feedflare) {
   $output = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>\n";
   $output .= "<!DOCTYPE FeedFlareUnit SYSTEM \"FeedFlareUnit-1.0.dtd\">\n";
@@ -31,57 +36,4 @@ function feedburner_feedflare($feedflare) {
 
   drupal_set_header('Content-Type: application/xml; charset=utf-8');
   print $output;
-}
-
-/**
- * Auto-completion callback.
- *
- * @todo REWRITE AND REVISE!
- */
-function feedburner_autocomplete($category) {
-  module_load_include('inc', 'feedburner', 'feedburner.admin');
-  $key = _feedburner_get_path(6);
-  $options = array('match' => $key, 'limit' => 10, 'feedburner' => TRUE);
-
-  if ($category == 'feedburner') {
-    $options += array('key' => 'feedburner', 'fields' => 'feedburner');
-  }
-  else {
-    $options += array('key' => 'path', 'alias' => TRUE);
-  }
-
-  // Fetch list of feeds
-  $feeds = _feedburner_get_feed_list($category, $options);
-
-  if ($category != 'feedburner') {
-    foreach ($feeds as $key => $feed) {
-      $description = '';
-      if ($feed['alias'] != $feed['path']) {
-        $description .= $feed['alias'] .' ('. $feed['path'] .')';
-      }
-      else {
-        $description .= $feed['path'];
-      }
-      if (isset($feed['description'])) {
-        $description .= ' - '. $feed['description'];
-      }
-      $feeds[$key] = $description;
-    }
-  }
-
-  drupal_json($feeds);
-
-  /*$feeds = _feedburner_get_feed_list($cat, array('match' => $key, 'feedburner' => FALSE));
-  $feeds = array_slice($feeds, 0, 10);
-  $keepers = array();
-  foreach ($feeds as $feed) {
-    if ($cat == 'feedburner') {
-      $keepers[$feed['feedburner']] = $feed['feedburner'];
-    }
-    else {
-      $keepers[$feed['path']] = ($feed['alias'] != $feed['path'] ? $feed['alias'] .' ('. $feed['path'] .')' : $feed['path']) . ($feed['description'] ? ' - '. $feed['description'] : '');
-    }
-  }
-
-  drupal_json($keepers);*/
 }

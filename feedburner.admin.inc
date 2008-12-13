@@ -423,7 +423,7 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
       $sql .= ' OR u.uid > 1';
     }
     elseif (count($blog_roles)) {
-      $sql .= ' OR ur.rid IN ('. db_placeholders($blog_roles) . ')';
+      $sql .= ' OR ur.rid IN ('. db_placeholders($blog_roles) .')';
       $args = array_keys($blog_roles);
     }
 
@@ -766,4 +766,57 @@ function _feedburner_get_feed_features($uri, $cache = TRUE) {
   cache_set('feedburner_feeds_details', $feed_cache, 'cache', CACHE_TEMPORARY);
 
   return $feed;
+}
+
+/**
+ * Retrieve a pipe delimited string of autocomplete suggestions for feeds.
+ *
+ * @todo REWRITE AND REVISE!
+ */
+function feedburner_admin_build_autocomplete($category) {
+  module_load_include('inc', 'feedburner', 'feedburner.admin');
+  $key = _feedburner_get_path(6);
+  $options = array('match' => $key, 'limit' => 10, 'feedburner' => TRUE);
+
+  if ($category == 'feedburner') {
+    $options += array('key' => 'feedburner', 'fields' => 'feedburner');
+  }
+  else {
+    $options += array('key' => 'path', 'alias' => TRUE);
+  }
+
+  // Fetch list of feeds
+  $feeds = _feedburner_get_feed_list($category, $options);
+
+  if ($category != 'feedburner') {
+    foreach ($feeds as $key => $feed) {
+      $description = '';
+      if ($feed['alias'] != $feed['path']) {
+        $description .= $feed['alias'] .' ('. $feed['path'] .')';
+      }
+      else {
+        $description .= $feed['path'];
+      }
+      if (isset($feed['description'])) {
+        $description .= ' - '. $feed['description'];
+      }
+      $feeds[$key] = $description;
+    }
+  }
+
+  drupal_json($feeds);
+
+  /* $feeds = _feedburner_get_feed_list($cat, array('match' => $key, 'feedburner' => FALSE));
+  $feeds = array_slice($feeds, 0, 10);
+  $keepers = array();
+  foreach ($feeds as $feed) {
+    if ($cat == 'feedburner') {
+      $keepers[$feed['feedburner']] = $feed['feedburner'];
+    }
+    else {
+      $keepers[$feed['path']] = ($feed['alias'] != $feed['path'] ? $feed['alias'] .' ('. $feed['path'] .')' : $feed['path']) . ($feed['description'] ? ' - '. $feed['description'] : '');
+    }
+  }
+
+  drupal_json($keepers);*/
 }

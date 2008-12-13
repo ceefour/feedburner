@@ -85,10 +85,10 @@ function feedburner_menu() {
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/build/feedburner/autocomplete'] = array(
-    'page callback' => 'feedburner_autocomplete',
+    'page callback' => 'feedburner_admin_build_autocomplete',
     'type' => MENU_CALLBACK,
     'access arguments' => array('administer FeedBurner'),
-    'file' => 'feedburner.pages.inc',
+    'file' => 'feedburner.admin.inc',
   );
   $items['feedburner/feedflare'] = array(
     'page callback' => 'feedburner_feedflare',
@@ -288,7 +288,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
       case 3:
         // return feedburner_block_feeds();
         module_load_include('inc', 'feedburner', 'feedburner.admin');
-        $block['subject'] = variable_get('site_name', 'Drupal') . t(' feeds');
+        $block['subject'] = t('@sitename feeds', array('@sitename' => variable_get('site_name', 'Drupal')));
         $feeds = db_query("SELECT path, feedburner FROM {feedburner}");
         //$block['content'] .= '<ul style="list-style-image: url(\'../../misc/feed.png\') !important;">';
         $block['content'] = '<ul>';
