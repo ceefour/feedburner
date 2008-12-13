@@ -238,7 +238,7 @@ function feedburner_settings_form() {
   $form['feedflare'] = array(
     '#type' => 'fieldset',
     '#title' => t('FeedFlare/Standard Stats/Ad Network'),
-    '#description' => t('See <a href="@link">@link</a> for more information.', array('@link' => 'http://www.feedburner.com/fb/a/publishers/feedflare')),
+    '#description' => t('See <a href="@link">@link</a> for more information.', array('@link' => 'http://feedburner.google.com/fb/a/publishers/feedflare')),
     '#collapsible' => FALSE,
   );
   $form['feedflare']['feedburner_feedflare_feed'] = array(
@@ -273,7 +273,7 @@ function feedburner_settings_form() {
   //$form['account'] = array(
   //  '#type' => 'fieldset',
   //  '#title' => t('FeedBurner account'),
-  //  '#description' => t('To use more advanced features like FeedFlare, e-mail subscriptions, and feed stats, you need to enter your FeedBurner account details. If you do not yet have a FeedBurner account, you can register at <a href="@link">@link</a>.', array('@link' => 'https://www.feedburner.com/fb/a/register')),
+  //  '#description' => t('To use more advanced features like FeedFlare, e-mail subscriptions, and feed stats, you need to enter your FeedBurner account details. If you do not yet have a FeedBurner account, you can register at <a href="@link">@link</a>.', array('@link' => 'https://feedburner.google.com/fb/a/register')),
   //  '#collapsible' => TRUE,
   //  '#collapsed' => FALSE,
   //);
@@ -361,11 +361,11 @@ function feedburner_settings_form_validate($form, &$form_state) {
 
   // feedburner_domain
   $feedburner_domain = $values['feedburner_domain'];
-  if (!variable_get('drupal_http_request_fails', FALSE) && $feedburner_domain != feedburner_var('domain') && $feedburner_domain != 'feeds.feedburner.com') {
+  if (!variable_get('drupal_http_request_fails', FALSE) && $feedburner_domain != feedburner_var('domain') && $feedburner_domain != 'feedproxy.google.com') {
     $request = drupal_http_request('http://'. $feedburner_domain .'/');
     unset($request->data);
     if (!isset($request->headers['X-FB-Host']) || !isset($request->code) || $request->code != 400 || !isset($request->error) || $request->error != 'You must provide a feed uri') {
-      // TODO: Insert help link for CNAME MyBrand editing (http://www.feedburner.com/fb/a/publishers/mybrand)
+      // TODO: Insert help link for CNAME MyBrand editing (http://feedburner.google.com/fb/a/publishers/mybrand)
       drupal_set_message(t('The MyBrand domain <a href="http://@domain/">@domain</a> failed verification. Make sure you have edited the domain\'s CNAME settings before enabling this option.', array('@domain' => $feedburner_domain)), 'error');
     }
   }
