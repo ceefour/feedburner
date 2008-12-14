@@ -170,7 +170,7 @@ function feedburner_burn_form_validate($form, &$form_state) {
 }
 
 function feedburner_burn_form_submit($form, &$form_state) {
-  _feedburner_save_feed($form_state['values']['path'], $form_state['values']['feedburner']);
+  feedburner_save_feed($form_state['values']['path'], $form_state['values']['feedburner']);
   drupal_set_message(t('The feed redirection for %path has been saved.', array('%path' => $form_state['values']['path'])));
 }
 
@@ -211,7 +211,7 @@ function feedburner_unburn_form_submit($form, &$form_state) {
     //if (isset($form_state['values']['unburn'])) {
     //  // TODO: Implement Management API DeleteFeed
     //}
-    _feedburner_save_feed($form_state['values']['path']);
+    feedburner_save_feed($form_state['values']['path']);
     drupal_set_message(t('Redirection for %url has been removed.', array('%url' => $form_state['values']['path'])));
     $form_state['redirect'] = 'admin/build/feedburner';
     return;

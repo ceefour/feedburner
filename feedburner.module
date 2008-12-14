@@ -109,7 +109,7 @@ function feedburner_boot() {
 }
 
 /**
- * Implementation of hook_init(). 
+ * Implementation of hook_init().
  */
 function feedburner_init() {
   if (feedburner_var('replace_html')) {
@@ -142,7 +142,7 @@ function feedburner_exit() {
         $changed = TRUE;
       }
     }
-    
+
     // If the page has been changed and caching is enabled, start a new output
     // buffer and save the new version to the cache. If nothing has changed,
     // simply output the page content.
@@ -183,12 +183,12 @@ function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
  */
 function feedburner_user($type, &$edit, &$account, $category = NULL) {
   if ($type == 'update' && isset($edit['feedburner_feedburner'])) {
-    _feedburner_save_feed($edit['feedburner_path'], $edit['feedburner_feedburner']);
+    feedburner_save_feed($edit['feedburner_path'], $edit['feedburner_feedburner']);
     $edit['feedburner_path'] = NULL;
     $edit['feeedburner_feedburner'] = NULL;
   }
   elseif ($type == 'delete') {
-    _feedburner_save_feed("blog/{$account->uid}/feed");
+    feedburner_save_feed("blog/{$account->uid}/feed");
   }
 }
 
@@ -393,7 +393,7 @@ function _feedburner_check_redirect($path) {
  *
  * @todo Run verification on FeedBurner feed.
  */
-function _feedburner_save_feed($path, $feedburner = NULL) {
+function feedburner_save_feed($path, $feedburner = NULL) {
   $current = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
 
   // @todo Check if '0' is a valid FeedBurner feed?
