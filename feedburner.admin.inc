@@ -219,11 +219,11 @@ function feedburner_unburn_form_submit($form, &$form_state) {
 }
 
 function feedburner_settings_form() {
-  $form['redirection'] = array(
+  $form['general'] = array(
     '#type' => 'fieldset',
-    '#title' => t('Feed redirection'),
+    '#title' => t('General settings'),
   );
-  $form['redirection']['feedburner_redirect_status'] = array(
+  $form['general']['feedburner_redirect_status'] = array(
     '#type' => 'select',
     '#title' => t('Redirection HTTP header status code'),
     '#default_value' => feedburner_var('redirect_status'),
@@ -231,7 +231,13 @@ function feedburner_settings_form() {
       301 => '301 Moved Permanently',
       302 => '302 Found',
       307 => '307 Temporary Redirect'),
-    '#description' => t('Please note that the "307 Temporary Redirect" is recommended. For detailed descriptions of HTTP redirect status codes, see <a href="@link">the Wikipedia article on HTTP status codes</a>.', array('@link' => 'http://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection')),
+    '#description' => t('Please note that the "307 Temporary Redirect" is recommended. For detailed descriptions of all the redirect status codes, see <a href="@link">the Wikipedia article on HTTP status codes</a>.', array('@link' => 'http://en.wikipedia.org/wiki/List_of_HTTP_status_codes#3xx_Redirection')),
+  );
+  $form['general']['feedburner_replace_html'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Replace all links to burned FeedBurner feeds in the source HTML.'),
+    '#default_value' => feedburner_var('replace_html'),
+    '#description' => t('This option is currently experimental, but should work just fine.'),
   );
 
   $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));

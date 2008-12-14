@@ -109,6 +109,55 @@ function feedburner_boot() {
 }
 
 /**
+ * Implementation of hook_init(). 
+ */
+function feedburner_init() {
+  if (feedburner_var('replace_html')) {
+    // Start another output buffer so we can catch it in feedburner_exit().
+    ob_start();
+  }
+}
+
+/**
+ * Implementation of hook_exit().
+ */
+function feedburner_exit() {
+  // Replace any links to original feed URLs with their FeedBurner equivalents.
+  if (feedburner_var('replace_html') && ob_get_level()) {
+    // Get the current output and clean the output buffer.
+    $data = ob_get_contents();
+    ob_end_clean();
+
+    // Perform URL replacements.
+    $changed = FALSE;
+    $query = db_query("SELECT path, feedburner FROM {feedburner} ORDER BY path DESC");
+    while ($feed = db_fetch_object($query)) {
+      $internal_url = url($feed->path);
+      $external_url = url($feed->path, array('absolute' => TRUE));
+      $regex = '%(href=")'. preg_quote($internal_url, '/') .'(")|'. preg_quote($external_url, '/') .'%i';
+      $replace = '$1'. _feedburner_construct_url($feed->feedburner) . '$2';
+      $count = 0;
+      $data = preg_replace($regex, $replace, $data, -1, $count);
+      if ($count) {
+        $changed = TRUE;
+      }
+    }
+    
+    // If the page has been changed and caching is enabled, start a new output
+    // buffer and save the new version to the cache. If nothing has changed,
+    // simply output the page content.
+    if ($changed && variable_get('cache', CACHE_DISABLED) != CACHE_DISABLED && page_get_cache(TRUE)) {
+      ob_start();
+      echo $data;
+      page_set_cache();
+    }
+    else {
+      echo $data;
+    }
+  }
+}
+
+/**
  * Implementation of hook_nodeapi().
  *
  * Inserts FeedFlare into nodes.
@@ -349,7 +398,7 @@ function _feedburner_save_feed($path, $feedburner = NULL) {
 
   // @todo Check if '0' is a valid FeedBurner feed?
   if (empty($feedburner)) {
-    db_query("DELETE FROM {feedburner} WHERE path = '%s'", $values['path']);
+    db_query("DELETE FROM {feedburner} WHERE path = '%s'", $path);
     if ($current == feedburner_var('feedflare_feed')) {
       variable_set('feedburner_feedflare_feed', 0);
     }
@@ -451,6 +500,7 @@ function feedburner_variables() {
     'feedburner_block_feedcount_feed' => 0,
     'feedburner_block_email_id' => 0,
     'feedburner_block_email_display' => 0,
+    'feedburner_replace_html' => 0,
     // Removed variables set to NULL.
     'feedburner_feeds' => NULL,
     'feedburner_blog' => NULL,

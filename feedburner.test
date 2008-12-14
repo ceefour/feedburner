@@ -30,7 +30,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
    */
   function testFeedRedirection() {
     // Save redirection and test that path is redirected.
-    _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
+    _feedburner_save_feed('rss.xml', 'example-feed');
     $this->assertRedirected('rss.xml', t('Feed was redirected.'));
     $this->assertText('FeedBurner feed');
     // $this->assertText('This feed was created for testing the Drupal FeedBurner module.');
@@ -45,7 +45,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->assertText('Local feed');
 
     // Remove redirection and test that path is not redirected.
-    _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => ''));
+    _feedburner_save_feed('rss.xml');
     $this->assertNotRedirected('rss.xml', t('Feed was not directed.'));
 
     // Unset the path alias (causes test errors later).
@@ -62,7 +62,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->assertTrue(cache_get(url('rss.xml', array('absolute' => TRUE)), 'cache_page'), t('Page has been cached.'));
 
     // Enable redirection for feed.
-    _feedburner_save_feed(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
+    _feedburner_save_feed('rss.xml', 'example-feed');
 
     // Test redirection with normal caching.
     $this->assertRedirected('rss.xml', t('Feed was redirected with normal caching enabled.'));
@@ -108,6 +108,30 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     $this->drupalLogin($no_blog_user);
     $this->drupalGet("user/{$no_blog_user->uid}/edit");
     $this->assertNoFieldByName('feedburner_feedburner');
+  }
+
+  /**
+   * Test replacing internal feed links in HTML to FeedBurner feed links.
+   */
+  function testFeedHTMLReplacement() {
+    // Enable a FeedBurner feed and check the proper original HTML is found.
+    _feedburner_save_feed('rss.xml', 'example-feed');
+    $this->drupalGet('');
+    $this->assertRaw(url('rss.xml', array('absolute' => TRUE)), t('Original feed URL found.'));
+    $this->assertNoRaw(_feedburner_construct_url('example-feed'), t('FeedBurner feed URL not found.'));
+
+    // Turn on feed HTML replacement and caching.
+    variable_set('feedburner_replace_html', 1);
+    variable_set('cache', CACHE_NORMAL);
+    $this->drupalGet('');
+    $this->assertNoRaw(url('rss.xml', array('absolute' => TRUE)), t('Original feed URL not found.'));
+    $this->assertRaw(_feedburner_construct_url('example-feed'), t('FeedBurner feed URL found.'));
+
+    // Check that the cached page has the replacements.
+    $this->assertTrue(cache_get(url('', array('absolute' => TRUE)), 'cache_page'), t('Page has been cached.'));
+    $this->drupalGet('');
+    $this->assertNoRaw(url('rss.xml', array('absolute' => TRUE)), t('Original feed URL not found.'));
+    $this->assertRaw(_feedburner_construct_url('example-feed'), t('FeedBurner feed URL found.'));
   }
 
   /* function testFeedFlare() {
