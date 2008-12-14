@@ -128,20 +128,8 @@ function feedburner_exit() {
     $data = ob_get_contents();
     ob_end_clean();
 
-    // Perform URL replacements.
-    $changed = FALSE;
-    $query = db_query("SELECT path, feedburner FROM {feedburner} ORDER BY path DESC");
-    while ($feed = db_fetch_object($query)) {
-      $internal_url = url($feed->path);
-      $external_url = url($feed->path, array('absolute' => TRUE));
-      $regex = '%(href=")'. preg_quote($internal_url, '/') .'(")|'. preg_quote($external_url, '/') .'%i';
-      $replace = '$1'. _feedburner_construct_url($feed->feedburner) . '$2';
-      $count = 0;
-      $data = preg_replace($regex, $replace, $data, -1, $count);
-      if ($count) {
-        $changed = TRUE;
-      }
-    }
+    // Replace feed URLs with FeedBurner feed URLs.
+    $changed = _feedburner_replace_feed_html($data);
 
     // If the page has been changed and caching is enabled, start a new output
     // buffer and save the new version to the cache. If nothing has changed,
@@ -384,7 +372,7 @@ function _feedburner_check_redirect($path) {
 }
 
 /**
- * Saves or deletes a FeedBurner feed to the {feedburner} table.
+ * Saves or deletes a FeedBurner feed.
  *
  * @param $feed
  *   A string of the local site path.
@@ -411,6 +399,33 @@ function feedburner_save_feed($path, $feedburner = NULL) {
     // if (_feedburner_can_api(TRUE)) {
     // }
   }
+}
+
+/**
+ * Perform URL replacement for feeds that have a FeedBurner feed in HTML code.
+ *
+ * @param $source
+ *   A string containing HTML code.
+ * @return
+ *   TRUE if replacements were made and the HTML was changed, FALSE otherwise.
+ */
+function _feedburner_replace_feed_html(&$source) {
+  $changed = FALSE;
+
+  $query = db_query("SELECT path, feedburner FROM {feedburner} ORDER BY path DESC");
+  while ($feed = db_fetch_object($query)) {
+    $internal_url = url($feed->path);
+    $external_url = url($feed->path, array('absolute' => TRUE));
+    $regex = '%(href=")'. preg_quote($internal_url, '/') .'(")|'. preg_quote($external_url, '/') .'%i';
+    $replace = '$1'. _feedburner_construct_url($feed->feedburner) . '$2';
+    $count = 0;
+    $source = preg_replace($regex, $replace, $source, -1, $count);
+    if ($count) {
+      $changed = TRUE;
+    }
+  }
+
+  return $changed;
 }
 
 /**
