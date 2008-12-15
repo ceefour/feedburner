@@ -711,26 +711,28 @@ function _feedburner_request_api($function, $args = array()) {
 /**
  * Retreive details about a FeedBurner feed.
  */
-function _feedburner_get_feed_features($uri, $cache = TRUE) {
-
+function _feedburner_get_feed_features($uri, $cache = FALSE) {
   // If there is a cached result, return it instead of processing again
-  $feed_cache = cache_get('feedburner_feeds_details');
-  if (!$feed_cache) {
-    $feed_cache = array();
-  }
-  elseif (isset($feed_cache->data[$uri]) && $cache) {
-    return $feed_cache->data[$uri];
-  }
-  else {
-    $feed_cache = $feed_cache->data;
+  if ($cache) {
+    $feed_cache = cache_get('feedburner_feeds_details');
+    if (!$feed_cache) {
+      $feed_cache = array();
+    }
+    elseif (isset($feed_cache->data[$uri]) && $cache) {
+      return $feed_cache->data[$uri];
+    }
+    else {
+      $feed_cache = $feed_cache->data;
+    }
   }
 
   $feed = new stdClass();
-  $feed->id = 0;
-  $feed->email = FALSE;
+  $feed->id = FALSE;
+  $feed->mail = FALSE;
   $feed->feedflare = FALSE;
   $feed->awareness = FALSE;
-  $feed->title = '';
+  $feed->title = FALSE;
+  $feed->verified = FALSE;
 
   // Scrape details from the actual feed
   $request = drupal_http_request(_feedburner_construct_url($uri) .'?format=xml');
@@ -740,10 +742,11 @@ function _feedburner_get_feed_features($uri, $cache = TRUE) {
     return $feed;
   }
   elseif ($request->code == 200) {
+    $feed->verified = TRUE;
 
     $features = array(
-      'email' => array('regex' => '%</feedburner:emailServiceId>%i'),
-      'id' => array('regex' => '%<feedburner:emailServiceId>(\w+)</feedburner:emailServiceId>%i', 'capture' => TRUE),
+      'mail' => array('regex' => '%</feedburner:emailServiceId>%i'),
+      'id' => array('regex' => '%<feedburner:emailServiceId .*>(.*)</feedburner:emailServiceId>%i', 'capture' => TRUE),
       'feedflare' => array('regex' => '%</feedburner:feedFlare>%i'),
       'awareness' => array('regex' => '%</feedburner:awareness>%i'),
       'title' => array('regex' => '%<title>(.*?)</title>%i', 'capture' => TRUE),
@@ -761,15 +764,17 @@ function _feedburner_get_feed_features($uri, $cache = TRUE) {
     }
   }
 
-  //// Get details using the Feed Management API
+  // @todo Get details using Feed Management API.
   //if (_feedburner_can_api(TRUE)) {
   //  $request = _feedburner_request_api('GetFeed', array('uri' => $uri));
   //  var_export($request);
   //}
 
   // Cache results for quick retrieval
-  $feed_cache[$uri] = $feed;
-  cache_set('feedburner_feeds_details', $feed_cache, 'cache', CACHE_TEMPORARY);
+  if ($cache) {
+    $feed_cache[$uri] = $feed;
+    cache_set('feedburner_feeds_details', $feed_cache, 'cache', CACHE_TEMPORARY);
+  }
 
   return $feed;
 }

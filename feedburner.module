@@ -180,15 +180,6 @@ function feedburner_user($type, &$edit, &$account, $category = NULL) {
 }
 
 /**
- * Validates a FeedBurner feed name.
- */
-function _feedburner_validate_feed($element, &$form_state) {
-  if (preg_match('%[^\w-/]%', $element['#value'])) {
-    form_set_error($element['#name'], t('Invalid FeedBurner feed name.'));
-  }
-}
-
-/**
  * Implementation of hook_form_FORM_ID_alter().
  */
 function feedburner_form_user_profile_form_alter(&$form, $form_state) {
@@ -223,17 +214,29 @@ function feedburner_form_user_profile_form_alter(&$form, $form_state) {
 }
 
 /**
+ * Implementation of hook_theme().
+ */
+function feedburner_theme() {
+  return array(
+    'feedburner_block_email' => array(
+      'arguments' => array('feed' => NULL),
+      'file' => 'feedburner.pages.inc',
+    ),
+    'feedburner_block_feedcount' => array(
+      'arguments' => array('feed' => NULL),
+      'file' => 'feedburner.pages.inc',
+    ),
+    'feedburner_block_feeds' => array(
+      'arguments' => array(),
+      'file' => 'feedburner.pages.inc',
+    ),
+  );
+}
+
+/**
  * Implementation of hook_block().
  */
 function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
-  module_load_include('inc', 'feedburner', 'feedburner.pages');
-  $block_functions = array(
-    0 => 'feedburner_block_feedflare',
-    1 => 'feedburner_block_email',
-    2 => 'feedburner_block_feedcount',
-    3 => 'feedburner_block_feeds',
-  );
-
   if ($op == 'list') {
     $blocks[0]['info'] = t('FeedBurner FeedFlare');
     $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
@@ -245,39 +248,27 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     $blocks[3]['cache'] = BLOCK_CACHE_GLOBAL;
     return $blocks;
   }
-
   elseif ($op == 'configure' && $delta == 1) {
     module_load_include('inc', 'feedburner', 'feedburner.admin');
-    $feeds = array(0 => 'None (disabled)');
-    $result = db_query('SELECT DISTINCT feedburner FROM {feedburner} ORDER BY feedburner');
-    while ($feed = db_result($result)) {
-      $details = _feedburner_get_feed_features($feed);
-      if ($details->id) {
-        $feeds[$details->id] = $feed;
-      }
-    }
-    $form['feedburner_block_email_id'] = array(
+    $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));
+    $form['feed'] = array(
       '#type' => 'select',
       '#title' => t('FeedBurner feed'),
-      '#default_value' => feedburner_var('block_email_id'),
+      '#default_value' => feedburner_var('block_email_feed'),
       '#options' => $feeds,
-      '#description' => t('Only feeds with the email subscription feature verified can be selected.'),
     );
-    $form['feedburner_block_email_display'] = array(
+    /*$form['display'] = array(
       '#type' => 'radios',
       '#title' => t('Display as'),
       '#default_value' => feedburner_var('block_email_display'),
       '#options' => array(t('Text link'), t('Inline form')),
-    );
+    );*/
     return $form;
   }
   elseif ($op == 'configure' & $delta == 2) {
-    $feeds = array(0 => 'None (disabled)');
-    $result = db_query('SELECT DISTINCT feedburner FROM {feedburner} ORDER BY feedburner');
-    while ($feed = db_result($result)) {
-      $feeds[$feed] = $feed;
-    }
-    $form['feedburner_block_feedcount_feed'] = array(
+    module_load_include('inc', 'feedburner', 'feedburner.admin');
+    $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));
+    $form['feed'] = array(
       '#type' => 'select',
       '#title' => t('FeedBurner feed'),
       '#default_value' => feedburner_var('block_feedcount_feed'),
@@ -286,19 +277,45 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     return $form;
   }
   elseif ($op == 'save' && $delta == 1) {
-    variable_set('feedburner_block_email_id', (int) $edit['feedburner_block_email_id']);
-    variable_set('feedburner_block_email_display', $edit['feedburner_block_email_display']);
+    module_load_include('inc', 'feedburner', 'feedburner.admin');
+    $feed_details = _feedburner_get_feed_features($edit['feed']);
+    if ($edit['feed'] && !$feed_details->mail) {
+      drupal_set_message(t('Could not confirm that your feed %feed-name is capable of e-mail subscriptions.', array('%feed-name' => $edit['feed'])), 'warning');
+    }
+    variable_set('feedburner_block_email_feed', $edit['feed']);
+    //variable_set('feedburner_block_email_display', $edit['display']);
   }
   elseif ($op == 'save' && $delta == 2) {
-    variable_set('feedburner_block_feedcount_feed', $edit['feedburner_block_feedcount_feed']);
+    variable_set('feedburner_block_feedcount_feed', $edit['feed']);
   }
   elseif ($op == 'view') {
     $block = array();
-    $block_functions[$delta]($block);
-    //$block_function = $block_functions[$delta] .'_view';
-    //$block_function($block);
-    //$block_functions[$delta]('view', $block);
-    //call_user_func($blocks[$delta], &$block);
+    switch ($delta) {
+      case 0:
+        if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2) == NULL) {
+          $node = node_load(arg(1));
+          if ($feedflare = _feedburner_get_feedflare_script($node)) {
+            $block['subject'] = t('FeedFlare');
+            $block['content'] = $feedflare;
+          }
+        }
+        break;
+      case 1:
+        if ($feed = feedburner_var('block_email_feed')) {
+          $block['subject']= t('Subscribe to @site-name by e-mail', array('@site-name' => variable_get('site_name', 'Drupal')));
+          $block['content'] = theme('feedburner_block_email', $feed);
+        }
+        break;
+      case 2:
+        if ($feed = feedburner_var('block_feedcount_feed')) {
+          $block['content'] = theme('feedburner_block_feedcount', $feed);
+        }
+        break;
+      case 3:
+        $block['subject'] = t('@sitename feeds', array('@sitename' => variable_get('site_name', 'Drupal')));
+        $block['content'] = theme('feedburner_block_feeds');
+        break;
+    }
     return $block;
   }
 }
@@ -366,6 +383,15 @@ function feedburner_save_feed($path, $feedburner = NULL) {
 }
 
 /**
+ * Validates a FeedBurner feed name.
+ */
+function _feedburner_validate_feed($element, &$form_state) {
+  if (preg_match('%[^\w-/]%', $element['#value'])) {
+    form_set_error($element['#name'], t('Invalid FeedBurner feed name.'));
+  }
+}
+
+/**
  * Perform URL replacement for feeds that have a FeedBurner feed in HTML code.
  *
  * @param $source
@@ -425,6 +451,7 @@ function _feedburner_can_api($valid_account = FALSE) {
  *   The extracted part of the path
  */
 function _feedburner_get_path($pos = 0) {
+  //drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
   $path = str_replace(' ', '+', $_GET['q']);
   if ($pos > 0) {
     $path = explode('/', $path, $pos);
@@ -477,13 +504,14 @@ function feedburner_variables() {
     'feedburner_domain' => 'feedproxy.google.com',
     'feedburner_useragents' => '/feedburner|feedvalidator/i',
     'feedburner_block_feedcount_feed' => 0,
-    'feedburner_block_email_id' => 0,
+    'feedburner_block_email_feed' => 0,
     'feedburner_block_email_display' => 0,
     'feedburner_replace_html' => 0,
     // Removed variables set to NULL.
     'feedburner_feeds' => NULL,
     'feedburner_blog' => NULL,
     'feedburner_standardstats' => NULL,
+    'feedburner_block_email_id' => NULL,
   );
 }
 
