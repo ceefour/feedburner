@@ -11,14 +11,13 @@
  */
 function feedburner_help($path, $arg) {
   switch ($path) {
-    case 'admin/help#feedburner':
-      $output = '';
+    // case 'admin/help#feedburner':
+    //  return '';
+    case 'admin/build/feedburner':
+      $output = '<p>'. t("This is the FeedBurner site feed redirection building page. Make sure to check out the <a href=\"@settings-link\">FeedBurner settings</a>.", array('@settings-link' => url('admin/settings/feedburner'))) .'</p>';
       return $output;
     case 'admin/settings/feedburner':
-      $output = '<p>'. t('These are the settings for the FeedBurner module. Once you have everything set, check out your site\'s <a href="@link">FeedBurner feeds</a>.', array('@link' => url('admin/build/feedburner'))) .'</p>';
-      return $output;
-    case 'admin/build/feedburner':
-      $output = '<p>'. t('This is the FeedBurner site feed redirection building page. Make sure to check out the <a href="@link">FeedBurner settings</a>.', array('@link' => url('admin/settings/feedburner'))) .'</p>';
+      $output = '<p>'. t("These are the settings for the FeedBurner module. Once you have everything set, check out your site's <a href=\"@build-link\">FeedBurner feeds</a>.", array('@build-link' => url('admin/build/feedburner'))) .'</p>';
       return $output;
   }
 }
@@ -105,7 +104,7 @@ function feedburner_menu() {
 function feedburner_boot() {
   drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
   $path = _feedburner_get_path();
-  _feedburner_check_redirect($path);
+  feedburner_check_redirect($path);
 }
 
 /**
@@ -227,6 +226,14 @@ function feedburner_form_user_profile_form_alter(&$form, $form_state) {
  * Implementation of hook_block().
  */
 function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
+  module_load_include('inc', 'feedburner', 'feedburner.pages');
+  $block_functions = array(
+    0 => 'feedburner_block_feedflare',
+    1 => 'feedburner_block_email',
+    2 => 'feedburner_block_feedcount',
+    3 => 'feedburner_block_feeds',
+  );
+
   if ($op == 'list') {
     $blocks[0]['info'] = t('FeedBurner FeedFlare');
     $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
@@ -238,6 +245,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     $blocks[3]['cache'] = BLOCK_CACHE_GLOBAL;
     return $blocks;
   }
+
   elseif ($op == 'configure' && $delta == 1) {
     module_load_include('inc', 'feedburner', 'feedburner.admin');
     $feeds = array(0 => 'None (disabled)');
@@ -285,57 +293,13 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     variable_set('feedburner_block_feedcount_feed', $edit['feedburner_block_feedcount_feed']);
   }
   elseif ($op == 'view') {
-    //module_load_include('inc', 'feedburner', 'feedburner.pages');
     $block = array();
-    switch ($delta) {
-      case 0:
-        //return feedburner_block_feedflare();
-        if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2) == NULL) {
-          $node = node_load(arg(1));
-          if ($feedflare = _feedburner_get_feedflare_script($node)) {
-            $block['subject'] = t('FeedFlare');
-            $block['content'] = $feedflare;
-          }
-        }
-        return $block;
-      case 1:
-        // return feedburner_block_email();
-        $id = feedburner_var('block_email_id');
-        if ($id) {
-          // TODO: Convert to Form API? or better containing divs?
-          $block['subject'] = t('Get E-mail Updates');
-          $block['content'] = '<form action="http://www.feedburner.com/fb/a/emailverify" method="post" target="popupwindow" onsubmit="window.open(\'http://www.feedburner.com\', \'popupwindow\', \'scrollbars=yes,width=550,height=520\');return true;" id="feedburner-block-email-form"><div class="container-inline" id="feedburner-block-email">';
-          $block['content'] .= '<div class="form-item">';
-          $block['content'] .= '<label for="feedburner-block-email-form-email">Enter your email address:</label>';
-          $block['content'] .= '<input type="text" size="15" name="email" id="feedburner-block-email-form-email" />';
-          $block['content'] .= '</div>';
-          $block['content'] .= '<input type="hidden" value="http://feeds.feedburner.com/~e?ffid='. $id .'" name="url"/>';
-          $block['content'] .= '<input type="submit" value="Subscribe" class="form-submit" />';
-          $block['content'] .= '<p>Delivered by <a href="http://www.feedburner.com">FeedBurner</a></p>';
-          $block['content'] .= '</div></form>';
-        }
-        return $block;
-      case 2:
-        // return feedburner_block_feedcount();
-        $feed = feedburner_var('block_feedcount_feed');
-        if (!empty($feed)) {
-          $block['content'] = '<a href="'. _feedburner_construct_url($feed) .'"><img src="http://feeds.feedburner.com/~fc/'. $feed .'?bg=99CCFF&amp;fg=444444&amp;anim=0" height="26" width="88" style="border:0" alt="" /></a>';
-        }
-        return $block;
-      case 3:
-        // return feedburner_block_feeds();
-        module_load_include('inc', 'feedburner', 'feedburner.admin');
-        $block['subject'] = t('@sitename feeds', array('@sitename' => variable_get('site_name', 'Drupal')));
-        $feeds = db_query("SELECT path, feedburner FROM {feedburner}");
-        //$block['content'] .= '<ul style="list-style-image: url(\'../../misc/feed.png\') !important;">';
-        $block['content'] = '<ul>';
-        while ($feed = db_fetch_object($feeds)) {
-          $features = _feedburner_get_feed_features($feed->feedburner);
-          $block['content'] .= '<li>'. theme('image', 'misc/feed.png') .' <a href="'. _feedburner_construct_url($feed->feedburner) .'">'. ($features->title ? $features->title : $feed->path) .'</a></li>';
-        }
-        $block['content'] .= '</ul>';
-        return $block;
-    }
+    $block_functions[$delta]($block);
+    //$block_function = $block_functions[$delta] .'_view';
+    //$block_function($block);
+    //$block_functions[$delta]('view', $block);
+    //call_user_func($blocks[$delta], &$block);
+    return $block;
   }
 }
 
@@ -346,7 +310,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
  * @param $path
  *   The current requested path.
  */
-function _feedburner_check_redirect($path) {
+function feedburner_check_redirect($path) {
   // Do not waste time and database hits on certain paths (admin paths, frontpage, node page)
   if (drupal_is_front_page() || preg_match('/^admin\/?|^node\/\d+\/?$/i', $path)) {
     return;
