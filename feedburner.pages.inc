@@ -72,7 +72,7 @@ function theme_feedburner_block_feedcount($feed) {
 /**
  * Theme function for feed block.
  */
-function theme_feedburner_block_feeds($feeds) {
+function theme_feedburner_block_feeds() {
   module_load_include('inc', 'feedburner', 'feedburner.admin');
   $items = array();
 
