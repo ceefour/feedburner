@@ -23,6 +23,7 @@ function feedburner_uninstall() {
   drupal_uninstall_schema('feedburner');
 
   // Remove variables.
+  drupal_load('module', 'feedburner');
   $variables = array_keys(feedburner_variables());
   foreach ($variables as $variable) {
     variable_del($variable);
