@@ -407,7 +407,7 @@ function _feedburner_replace_feed_html(&$source) {
     $internal_url = url($feed->path);
     $external_url = url($feed->path, array('absolute' => TRUE));
     $regex = '%(href=")'. preg_quote($internal_url, '/') .'(")|'. preg_quote($external_url, '/') .'%i';
-    $replace = '$1'. _feedburner_construct_url($feed->feedburner) . '$2';
+    $replace = '$1'. _feedburner_construct_url($feed->feedburner) .'$2';
     $count = 0;
     $source = preg_replace($regex, $replace, $source, -1, $count);
     if ($count) {
