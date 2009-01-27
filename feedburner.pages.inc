@@ -65,7 +65,7 @@ function theme_feedburner_block_email($feed) {
  * Theme function for feed count block.
  */
 function theme_feedburner_block_feedcount($feed) {
-  $image = theme_image('http://feedproxy.google.com/~fc/'. $feed .'?bg=99CCFF&fg=444444&anim=0', '', '', array('width' => 88, 'height' => 26), FALSE);
+  $image = theme_image(_feedburner_construct_url('~fc/'. $feed .'?bg=99CCFF&fg=444444&anim=0'), '', '', array('width' => 88, 'height' => 26), FALSE);
   return l($image, _feedburner_construct_url($feed), array('html' => TRUE));
 }
 
