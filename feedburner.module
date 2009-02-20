@@ -13,12 +13,12 @@ function feedburner_help($path, $arg) {
   switch ($path) {
     // case 'admin/help#feedburner':
     //  return '';
-    case 'admin/build/feedburner':
-      $output = '<p>'. t("This is the FeedBurner site feed redirection building page. Make sure to check out the <a href=\"@settings-link\">FeedBurner settings</a>.", array('@settings-link' => url('admin/settings/feedburner'))) .'</p>';
-      return $output;
-    case 'admin/settings/feedburner':
-      $output = '<p>'. t("These are the settings for the FeedBurner module. Once you have everything set, check out your site's <a href=\"@build-link\">FeedBurner feeds</a>.", array('@build-link' => url('admin/build/feedburner'))) .'</p>';
-      return $output;
+    //case 'admin/build/feedburner':
+    //  $output = '<p>'. t("This is the FeedBurner site feed redirection building page. Make sure to check out the <a href=\"@settings-link\">FeedBurner settings</a>.", array('@settings-link' => url('admin/settings/feedburner'))) .'</p>';
+    //  return $output;
+    //case 'admin/settings/feedburner':
+    //  $output = '<p>'. t("These are the settings for the FeedBurner module. Once you have everything set, check out your site's <a href=\"@build-link\">FeedBurner feeds</a>.", array('@build-link' => url('admin/build/feedburner'))) .'</p>';
+    //  return $output;
   }
 }
 
@@ -75,8 +75,9 @@ function feedburner_menu() {
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
-  $items['admin/settings/feedburner'] = array(
+  $items['admin/build/feedburner/settings'] = array(
     'title' => 'FeedBurner',
+    'type' => MENU_LOCAL_TASK,
     'description' => 'Administer FeedBurner integration.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_settings_form'),
@@ -108,19 +109,31 @@ function feedburner_boot() {
 }
 
 /**
+ * Implementation of hook_url_alter_outbound() from the url_alter module.
+ */
+/*function feedburner_url_alter_outbound(&$path, &$options, $original_path) {
+  if (!preg_match('/^admin\/?|^node\/\d+\/?$/i', $path)) {
+    if ($result = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", array(':path' => $path)))) {
+      $path = _feedburner_contstruct_url($result);
+      $options['external'] = TRUE;
+    }
+  }
+}*/
+
+/**
  * Implementation of hook_init().
  */
-function feedburner_init() {
+/*function feedburner_init() {
   if (feedburner_var('replace_html')) {
     // Start another output buffer so we can catch it in feedburner_exit().
     ob_start();
   }
-}
+}*/
 
 /**
  * Implementation of hook_exit().
  */
-function feedburner_exit() {
+/*function feedburner_exit() {
   // Replace any links to original feed URLs with their FeedBurner equivalents.
   if (feedburner_var('replace_html') && ob_get_level()) {
     // Get the current output and clean the output buffer.
@@ -142,17 +155,18 @@ function feedburner_exit() {
       echo $data;
     }
   }
-}
+}*/
 
 /**
  * Implementation of hook_nodeapi().
  *
- * Inserts FeedFlare into nodes.
+ * Inserts FeedFlare into nodes. Also pings the FeedBurner service when nodes
+ * are updated if the ping module is disabled.
  */
 function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
   if ($op == 'view' && $node->build_mode != NODE_BUILD_PREVIEW && user_access('view FeedFlare')) {
     $display = $teaser ? 'teaser' : ($page ? 'page' : NULL);
-    //$display = array('teaser' => $teser, 'page' => $page);
+    //$display = array('teaser' => $teaser, 'page' => $page);
     $feedflare_display = feedburner_var('feedflare_display');
     if (in_array($display, $feedflare_display) && $feedflare = _feedburner_get_feedflare_script($node)) {
       $node->content['feedflare'] = array(
@@ -160,6 +174,25 @@ function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
         '#weight' => 10,
       );
     }
+  }
+
+  // Ping the FeedBurner service
+  if (!module_exists('ping') && ($op == 'insert' || $op == 'update' || $op == 'delete')) {
+    // If the last ping was less than 10 minutes ago, do not ping again.
+    //if ($_SERVER['REQUEST_TIME'] - feedburner_var('ping_last') < 600) {
+      feedburner_ping(variable_get('site_name', 'Drupal'), url('', array('absolute' => TRUE)));
+    //}
+  }
+}
+
+/**
+ * Implementation of hook_ping().
+ */
+function feedburner_ping($name = '', $url = '') {
+  variable_set('feedburner_ping_last', $_SERVER['REQUEST_TIME']);
+  $result = xmlrpc('http://ping.feedburner.google.com/', 'weblogUpdates.ping', $name, $url);
+  if ($result === FALSE) {
+    watchdog('feedburner', 'Failed to ping FeedBurner.', array(), WATCHDOG_WARNING);
   }
 }
 
@@ -204,7 +237,7 @@ function feedburner_form_user_profile_form_alter(&$form, $form_state) {
         '#title' => t('FeedBurner feed'),
         '#maxlength' => 100,
         '#size' => 25,
-        '#default_value' => db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $user_blog_feed)),
+        '#default_value' => db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", array(':path' => $user_blog_feed))),
         '#field_prefix' => _feedburner_construct_url(),
         '#description' => t("Requests for <a href=\"@blog-feed\">your blog's feed</a> will be redirected to the FeedBurner feed specified above. Leave this blank to disable redirection for your blog's feed.", array('@blog-feed' => url($user_blog_feed, array('absolute' => TRUE)))),
         '#element_validate' => array('_feedburner_validate_feed'),
@@ -399,7 +432,7 @@ function _feedburner_validate_feed($element, &$form_state) {
  * @return
  *   TRUE if replacements were made and the HTML was changed, FALSE otherwise.
  */
-function _feedburner_replace_feed_html(&$source) {
+/*function _feedburner_replace_feed_html(&$source) {
   $changed = FALSE;
 
   $query = db_query("SELECT path, feedburner FROM {feedburner} ORDER BY path DESC");
@@ -416,7 +449,7 @@ function _feedburner_replace_feed_html(&$source) {
   }
 
   return $changed;
-}
+}*/
 
 /**
  * Constructs an absolute url based on a FeedBurner feed URI.
@@ -486,7 +519,7 @@ function _feedburner_get_feedflare_script($node) {
   $feedflare_feed = feedburner_var('feedflare_feed');
   $feedflare_node_types = feedburner_var('feedflare_node_types');
   if ($feedflare_feed && in_array($node->type, $feedflare_node_types)) {
-    return '<script src="http://feeds.feedburner.com/~s/'. $feedflare_feed .'?i='. url('node/'. $node->nid, array('absolute' => TRUE)) .'" type="text/javascript" charset="utf-8"></script>';
+    return '<script src="'. _feedburner_construct_url('~s/'. $feedflare_feed) .'/?i='. url('node/'. $node->nid, array('absolute' => TRUE)) .'" type="text/javascript" charset="utf-8"></script>';
   }
   return FALSE;
 }
@@ -507,6 +540,7 @@ function feedburner_variables() {
     'feedburner_block_email_feed' => 0,
     'feedburner_block_email_display' => 0,
     'feedburner_replace_html' => 0,
+    'feedburner_ping_last' => 0,
     // Removed variables set to NULL.
     'feedburner_feeds' => NULL,
     'feedburner_blog' => NULL,
@@ -518,7 +552,7 @@ function feedburner_variables() {
 /**
  * Internal implementation of variable_get().
  */
-function feedburner_var($name) {
+function feedburner_var($name, $default = NULL) {
   static $defaults = NULL;
   if (!isset($defaults)) {
     $defaults = feedburner_variables();
@@ -527,8 +561,8 @@ function feedburner_var($name) {
   $name = 'feedburner_'. $name;
 
   if (!isset($defaults[$name])) {
-    watchdog('feedburner', 'Default variable for %variable not found.', array('%variable' => $name));
+    watchdog('feedburner', 'Default variable for %variable not found.', array('%variable' => $name), WATCHDOG_WARNING);
   }
 
-  return variable_get($name, isset($defaults[$name]) ? $defaults[$name] : NULL);
+  return variable_get($name, isset($default) || !isset($defaults[$name]) ? $default : $defaults[$name]);
 }
