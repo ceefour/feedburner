@@ -332,7 +332,6 @@ function feedburner_settings_form() {
     '#field_prefix' => 'http://',
     '#field_suffix' => '/feedname',
     '#size' => 30,
-    '#maxlength' => 30,
   );
 
   return system_settings_form($form);
