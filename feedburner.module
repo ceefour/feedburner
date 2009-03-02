@@ -501,6 +501,7 @@ function _feedburner_get_feed_categories() {
     'site' => array('default' => TRUE),
     'blogs' => array('module' => 'blog'),
     'taxonomy' => array('module' => 'taxonomy'),
+    'organic groups' => array('module' => 'og'),
     //'views' => array('module' => 'views'),
   );
 }

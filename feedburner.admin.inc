@@ -448,6 +448,14 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
     unset($query);
   }
 
+  // Organic groups
+  if (($category == 'all' || $category == 'organic groups') && module_exists('og')) {
+    $query = db_query("SELECT nid, title FROM {og}");
+    while ($group = db_fetch_object($query)) {
+      $feeds[] = array('path' => 'node/'. $group->nid .'/feed', 'description' => $group->title);
+    }
+  }
+
   // Merge FeedBurner feed data into list
   // TODO: Fetch FeedBurner feeds from FeedManagement API
   if ($category == 'feedburner' || $options['feedburner']) {
