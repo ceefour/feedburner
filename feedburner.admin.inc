@@ -7,7 +7,7 @@
  */
 
 function feedburner_build_overview($category) {
-  $keys = _feedburner_get_path(6);
+  $keys = _feedburner_get_path_segment(6);
   $output = drupal_get_form('feedburner_build_filter_form', $category, $keys);
 
   $header = array(
@@ -23,8 +23,7 @@ function feedburner_build_overview($category) {
   $rows = array();
   foreach ($feeds as $feed) {
     $row = array();
-    //$row[] = l($feed['path'] . (isset($feed['alias']) ? ' ('. $feed['alias'] .')' : ''), $feed['path']);
-    $row[] = l(($feed['alias'] != $feed['path'] ? $feed['alias'] .' ('. $feed['path'] .')' : $feed['path']), $feed['path']);
+    $row[] = l($feed['alias'], $feed['path'], array('attributes' => array('alt' => $feed['description'], 'title' => $feed['description'])));
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
       $row[] = l(t('Edit'), 'admin/build/feedburner/burn/'. $feed['path']);
@@ -118,7 +117,7 @@ function feedburner_build_filter_form_submit_reset($form, &$form_state) {
 
 
 function feedburner_burn_form() {
-  $path = _feedburner_get_path(5);
+  $path = _feedburner_get_path_segment(5);
   $feedburner = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
 
   $form['path'] = array(
@@ -170,13 +169,13 @@ function feedburner_burn_form_validate($form, &$form_state) {
 }
 
 function feedburner_burn_form_submit($form, &$form_state) {
-  feedburner_save_feed($form_state['values']['path'], $form_state['values']['feedburner']);
+  feedburner_save($form_state['values']);
   drupal_set_message(t('The feed redirection for %path has been saved.', array('%path' => $form_state['values']['path'])));
 }
 
 
 function feedburner_unburn_form() {
-  $path = _feedburner_get_path(5);
+  $path = _feedburner_get_path_segment(5);
   $feed = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
 
   if (empty($path) || empty($feed)) {
@@ -211,7 +210,7 @@ function feedburner_unburn_form_submit($form, &$form_state) {
     //if (isset($form_state['values']['unburn'])) {
     //  // TODO: Implement Management API DeleteFeed
     //}
-    feedburner_save_feed($form_state['values']['path']);
+    feedburner_delete(array('path' => $form_state['values']['path']));
     drupal_set_message(t('Redirection for %url has been removed.', array('%url' => $form_state['values']['path'])));
     $form_state['redirect'] = 'admin/build/feedburner';
     return;
@@ -337,7 +336,6 @@ function feedburner_settings_form() {
   return system_settings_form($form);
 }
 
-
 function feedburner_settings_form_validate($form, &$form_state) {
   $values =& $form_state['values'];
 
@@ -366,13 +364,122 @@ function feedburner_settings_form_validate($form, &$form_state) {
 
   // feedburner_domain
   $feedburner_domain = $values['feedburner_domain'];
-  if (!variable_get('drupal_http_request_fails', FALSE) && $feedburner_domain != feedburner_var('domain') && $feedburner_domain != 'feedproxy.google.com') {
+  if ($feedburner_domain != feedburner_var('domain')) {
     $request = drupal_http_request('http://'. $feedburner_domain .'/');
-    unset($request->data);
     if (!isset($request->headers['X-FB-Host']) || !isset($request->code) || $request->code != 400 || !isset($request->error) || $request->error != 'You must provide a feed uri') {
       // TODO: Insert help link for CNAME MyBrand editing (http://feedburner.google.com/fb/a/publishers/mybrand)
       drupal_set_message(t('The MyBrand domain <a href="http://@domain/">@domain</a> failed verification. Make sure you have edited the domain\'s CNAME settings before enabling this option.', array('@domain' => $feedburner_domain)), 'error');
     }
+  }
+}
+
+/**
+ * Get a list of site feeds.
+ */
+function _feedburner_get_site_feeds(&$feeds) {
+  $feeds[] = array('path' => 'rss.xml', 'description' => variable_get('site_name', 'Drupal') .' frontpage feed');
+  $feeds[] = array('path' => 'aggregator/feed', 'description' => 'Aggregator feed', 'module' => 'aggregator');
+  $feeds[] = array('path' => 'blog/feed', 'description' => variable_get('site_name', 'Drupal') .' blogs');
+  $feeds[] = array('path' => 'crss', 'description' => variable_get('site_name', 'Drupal') .' comments', 'module' => 'commentrss');
+  $feeds[] = array('path' => 'atom/feed', 'description' => variable_get('site_name', 'Drupal') .' ATOM', 'module' => 'atom');
+}
+
+/**
+ * Get a list of views feeds.
+ */
+function _feedburner_get_views_feeds(&$feeds, $key = NULL) {
+  $views = views_get_all_views();
+  foreach ($views as $view_key => $view) {
+    if ((isset($key) && !strpos($view_key, $key) === FALSE) || !empty($view->disabled)) {
+      continue;
+    }
+    foreach ($view->display as $display) {
+      if ($display->display_plugin == 'feed') {
+        $view->set_display($display->id);
+        if ($view->display_handler->get_option('path') != 'not_used') {
+          $feeds[] = array(
+            'path' => $view->display_handler->get_option('path'),
+            'description' => $view->display_handler->get_option('title'),
+          );
+        }
+        break;
+      }
+    }
+  }
+}
+
+/**
+ * Get a list of blog feeds.
+ */
+function _feedburner_get_blog_feeds(&$feeds) {
+  $feeds[] = array(
+    'path' => 'blog/feed',
+    'description' => variable_get('site_name', 'Drupal') .' blogs',
+  );
+
+  // Get all user blog feeds for users with the blogging permission granted
+  $sql = "SELECT u.uid, u.name FROM {users} u LEFT JOIN {users_roles} ur USING (uid) WHERE u.uid = 1";
+  $args = array();
+
+  $blog_roles = user_roles(TRUE, 'create blog entries');
+  // if (isset($blog_roles[DRUPAL_ANONYMOUS_RID])) {}
+  if (isset($blog_roles[DRUPAL_AUTHENTICATED_RID])) {
+    $sql .= ' OR u.uid > 1';
+  }
+  elseif (count($blog_roles)) {
+    $sql .= ' OR ur.rid IN ('. db_placeholders($blog_roles) .')';
+    $args = array_keys($blog_roles);
+  }
+
+  $query = db_query($sql, $args);
+  while ($account = db_fetch_object($query)) {
+    $feeds[] = array(
+      'path' => 'blog/'. $account->uid .'/feed',
+      'description' => t("@username's blog", array('@username' => $account->name)),
+    );
+  }
+}
+
+/**
+ * Get a list of taxonomy feeds.
+ */
+function _feedburner_get_taxonomy_feeds(&$feed) {
+  $query = db_query('SELECT tid, name FROM {term_data}');
+  while ($term = db_fetch_object($query)) {
+    $feeds[] = array(
+      'path' => 'taxonomy/term/'. $term->tid .'/0/feed',
+      'description' => $term->name,
+    );
+  }
+}
+
+/**
+ * Get a list of organic gropus feeds.
+ */
+function _feedburner_get_og_feeds(&$feeds) {
+  /*$feeds[] = array(
+    'path' => 'og/all/feed',
+    'description' => t('Groups'),
+  );
+  $feeds[] = array(
+    'path' => 'group/tracker/feed',
+    'description' => t('Recent posts across whole site'),
+  );*/
+  //$feeds[] = array(
+  //  'path' => 'group/myunread/feed',
+  //  'description' => t('Unread posts in my group'),
+  //);
+  //$feeds[] = array(
+  //  'path' => 'group/mytracker/feed',
+  //  'description' => t('Recent posts in my groups'),
+  //);
+  _feedburner_get_views_feeds($feeds, 'og_');
+  $query = db_query("SELECT n.nid, n.title FROM {og} og LEFT JOIN {node} n USING (nid)");
+  while ($group = db_fetch_object($query)) {
+    $feeds[] = array(
+      'path' => 'node/'. $group->nid .'/feed',
+      'description' => $group->title,
+    );
   }
 }
 
@@ -388,71 +495,11 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
   $options += array('feedburner' => FALSE);
   $feeds = array();
 
-  // Site feeds (and various module feeds)
-  if ($category == 'site' || $category == 'all') {
-    $feeds[] = array('path' => 'rss.xml', 'description' => variable_get('site_name', 'Drupal') .' frontpage feed');
-    $feeds[] = array('path' => 'aggregator/feed', 'description' => 'Aggregator feed', 'module' => 'aggregator');
-    $feeds[] = array('path' => 'blog/feed', 'description' => variable_get('site_name', 'Drupal') .' blogs');
-    $feeds[] = array('path' => 'crss', 'description' => variable_get('site_name', 'Drupal') .' comments', 'module' => 'commentrss');
-    $feeds[] = array('path' => 'atom/feed', 'description' => variable_get('site_name', 'Drupal') .' ATOM', 'module' => 'atom');
-  }
-
-  // Views integration
-  if (($category == 'site' || $category == 'all') && module_exists('views')) {
-    $views = views_get_all_views();
-    foreach ($views as $view) {
-      if (isset($view->disabled) && $view->disabled) {
-        continue;
-      }
-      foreach ($view->display as $display) {
-        if ($display->display_plugin == 'feed') {
-          $view->set_display($display->id);
-          $feeds[] = array('path' => $view->display_handler->get_option('path'), 'description' => $view->display_handler->get_option('title'));
-          break;
-        }
-      }
-    }
-  }
-
-  // Blog module feeds
-  if (($category == 'all' || $category == 'blogs' ) && module_exists('blog')) {
-    $feeds[] = array('path' => 'blog/feed', 'description' => variable_get('site_name', 'Drupal') .' blogs');
-
-    // Get all user blog feeds for users with the blogging permission granted
-    $sql = "SELECT u.uid, u.name FROM {users} u LEFT JOIN {users_roles} ur ON ur.uid = u.uid WHERE u.uid = 1";
-    $args = array();
-
-    $blog_roles = user_roles(TRUE, 'create blog entries');
-    // if (isset($blog_roles[DRUPAL_ANONYMOUS_RID])) {}
-    if (isset($blog_roles[DRUPAL_AUTHENTICATED_RID])) {
-      $sql .= ' OR u.uid > 1';
-    }
-    elseif (count($blog_roles)) {
-      $sql .= ' OR ur.rid IN ('. db_placeholders($blog_roles) .')';
-      $args = array_keys($blog_roles);
-    }
-
-    $query = db_query($sql, $args);
-    while ($blogging_user = db_fetch_object($query)) {
-      $feeds[] = array('path' => 'blog/'. $blogging_user->uid .'/feed', 'description' => $blogging_user->name ."'s Blog");
-    }
-    unset($query);
-  }
-
-  // Taxonomy feeds
-  if (($category == 'all' || $category == 'taxonomy') && module_exists('taxonomy')) {
-    $query = db_query('SELECT tid, name FROM {term_data}');
-    while ($term = db_fetch_object($query)) {
-      $feeds[] = array('path' => 'taxonomy/term/'. $term->tid .'/0/feed', 'description' => $term->name);
-    }
-    unset($query);
-  }
-
-  // Organic groups
-  if (($category == 'all' || $category == 'organic groups') && module_exists('og')) {
-    $query = db_query("SELECT nid, title FROM {og}");
-    while ($group = db_fetch_object($query)) {
-      $feeds[] = array('path' => 'node/'. $group->nid .'/feed', 'description' => $group->title);
+  $categories = _feedburner_get_feed_categories();
+  foreach ($categories as $category_key => $category_options) {
+    $function = '_feedburner_get_'. $category_key .'_feeds';
+    if (($category == $category_key || $category == 'all') && $category_options['access'] && function_exists($function)) {
+      $function($feeds);
     }
   }
 
@@ -474,7 +521,6 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
         }
       }
     }
-    unset($query);
   }
 
   //if ($category == 'feedburner' || $options['feedburner']) {
@@ -601,13 +647,13 @@ function _feedburner_process_feed_list($feeds, $options = array()) {
 
   // If a limit is specified, trim the list. We do this after sorting so that
   // best results will always be at the top.
-  if ($options['limit'] && is_int($options['limit'])) {
+  if ($options['limit']) {
     $keepers = array_slice($keepers, 0, $options['limit']);
   }
 
   $feeds = array();
   foreach ($keepers as &$feed) {
-    // TODO: Drupal 7 / PHP 5, replace with array_combine()?
+    //@todo Replace with array_combine in Drupal 7.
     $key = $options['key'] ? $feed['key'] : count($feeds);
     unset($feed['key']);
     if ($options['fields']) {
@@ -793,7 +839,7 @@ function _feedburner_get_feed_features($uri, $cache = FALSE) {
  */
 function feedburner_admin_build_autocomplete($category) {
   module_load_include('inc', 'feedburner', 'feedburner.admin');
-  $key = _feedburner_get_path(6);
+  $key = _feedburner_get_path_segment(6);
   $options = array('match' => $key, 'limit' => 10, 'feedburner' => TRUE);
 
   if ($category == 'feedburner') {

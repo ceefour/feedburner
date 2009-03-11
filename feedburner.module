@@ -26,7 +26,11 @@ function feedburner_help($path, $arg) {
  * Implementation of hook_perm().
  */
 function feedburner_perm() {
-  return array('administer FeedBurner', 'view FeedFlare', 'add FeedBurner feed to own blog');
+  return array(
+    'administer FeedBurner',
+    'view FeedFlare',
+    'add FeedBurner feed to own blog',
+  );
 }
 
 /**
@@ -46,14 +50,20 @@ function feedburner_menu() {
     'type' => MENU_DEFAULT_LOCAL_TASK,
     'weight' => -10,
   );
-  foreach (_feedburner_get_feed_categories() as $category => $options) {
-    if (!isset($option['module']) || module_exists($options['module'])) {
-      $items['admin/build/feedburner/list/'. $category] = array(
-        'title' => drupal_ucfirst($category),
-        'type' => isset($options['default']) ? MENU_DEFAULT_LOCAL_TASK : MENU_LOCAL_TASK,
-        'weight' => isset($options['default']) ? -10 : 0,
+  $categories = _feedburner_get_feed_categories();
+  ksort($categories);
+  foreach ($categories as $category_key => $category_options) {
+    $category_options += array(
+      'default' => FALSE,
+      'title' => drupal_ucfirst($category_key),
+    );
+    if ($category_options['access']) {
+      $items['admin/build/feedburner/list/'. $category_key] = array(
+        'title' => $category_options['title'],
+        'type' => $category_options['default'] ? MENU_DEFAULT_LOCAL_TASK : MENU_LOCAL_TASK,
+        'weight' => $category_options['default'] ? -10 : 0,
         'page callback' => 'feedburner_build_overview',
-        'page arguments' => array($category),
+        'page arguments' => array($category_key),
         'access arguments' => array('administer FeedBurner'),
         'file' => 'feedburner.admin.inc',
       );
@@ -76,9 +86,9 @@ function feedburner_menu() {
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/build/feedburner/settings'] = array(
-    'title' => 'FeedBurner',
+    'title' => 'Settings',
     'type' => MENU_LOCAL_TASK,
-    'description' => 'Administer FeedBurner integration.',
+    'description' => 'Change settings for FeedBurner.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_settings_form'),
     'access arguments' => array('administer FeedBurner'),
@@ -104,7 +114,7 @@ function feedburner_menu() {
  */
 function feedburner_boot() {
   drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
-  $path = _feedburner_get_path();
+  $path = _feedburner_get_path_segment();
   feedburner_check_redirect($path);
 }
 
@@ -159,12 +169,28 @@ function feedburner_boot() {
 
 /**
  * Implementation of hook_nodeapi().
- *
- * Inserts FeedFlare into nodes. Also pings the FeedBurner service when nodes
- * are updated if the ping module is disabled.
+ * @todo Remove in Drupal 7.
  */
-function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
-  if ($op == 'view' && $node->build_mode != NODE_BUILD_PREVIEW && user_access('view FeedFlare')) {
+function feedburner_nodeapi(&$node, $op, $a3 = NULL, $a4 = NULL) {
+  switch ($op) {
+    case 'view':
+      return feedburner_node_view($node, $a3, $a4);
+    case 'insert':
+      return feedburner_node_insert($node);
+    case 'update':
+      return feedburner_node_update($node);
+    case 'delete':
+      return feedburner_node_delete($node);
+  }
+}
+
+/**
+ * Implementation of hook_node_view().
+ *
+ * Inserts FeedFlare into nodes.
+ */
+function feedburner_node_view(&$node, $teaser = NULL, $page = NULL) {
+  if ($node->build_mode != NODE_BUILD_PREVIEW && user_access('view FeedFlare')) {
     $display = $teaser ? 'teaser' : ($page ? 'page' : NULL);
     //$display = array('teaser' => $teaser, 'page' => $page);
     $feedflare_display = feedburner_var('feedflare_display');
@@ -175,13 +201,34 @@ function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
       );
     }
   }
+}
 
-  // Ping the FeedBurner service
-  if (!module_exists('ping') && ($op == 'insert' || $op == 'update' || $op == 'delete')) {
-    // If the last ping was less than 10 minutes ago, do not ping again.
-    //if ($_SERVER['REQUEST_TIME'] - feedburner_var('ping_last') < 600) {
-      feedburner_ping(variable_get('site_name', 'Drupal'), url('', array('absolute' => TRUE)));
-    //}
+/**
+ * Implementation of hook_node_insert().
+ *
+ * Pings the FeedBurner service when nodes as inserted.
+ */
+function feedburner_node_insert($node) {
+  if ($node->status && !module_exists('ping')) {
+    feedburner_ping();
+  }
+}
+
+/**
+ * Implementation of hook_node_update().
+ */
+function feedburner_node_update($node) {
+  if (!module_exists('ping')) {
+    feedburner_ping();
+  }
+}
+
+/**
+ * Implementation of hook_node_delete().
+ */
+function feedburner_node_delete($node) {
+  if ($node->status && !module_exists('ping')) {
+    feedburner_ping();
   }
 }
 
@@ -189,11 +236,20 @@ function feedburner_nodeapi(&$node, $op, $teaser = NULL, $page = NULL) {
  * Implementation of hook_ping().
  */
 function feedburner_ping($name = '', $url = '') {
+  if (empty($name)) {
+    $name = variable_get('site_name', 'Drupal');
+  }
+  if (empty($url)) {
+    $url = url('', array('absolute' => TRUE));
+  }
   variable_set('feedburner_ping_last', $_SERVER['REQUEST_TIME']);
+  // If the last ping was less than 10 minutes ago, do not ping again.
+  //if ($_SERVER['REQUEST_TIME'] - feedburner_var('ping_last') < 600) {
   $result = xmlrpc('http://ping.feedburner.google.com/', 'weblogUpdates.ping', $name, $url);
   if ($result === FALSE) {
     watchdog('feedburner', 'Failed to ping FeedBurner.', array(), WATCHDOG_WARNING);
   }
+  //}
 }
 
 /**
@@ -202,14 +258,30 @@ function feedburner_ping($name = '', $url = '') {
  * Displays, validates and saves an option to redirect a user's blog feed.
  */
 function feedburner_user($type, &$edit, &$account, $category = NULL) {
-  if ($type == 'update' && isset($edit['feedburner_feedburner'])) {
-    feedburner_save_feed($edit['feedburner_path'], $edit['feedburner_feedburner']);
+  switch ($type) {
+    case 'update':
+      return feedburner_user_update($edit, $account, $category);
+    case 'delete':
+      return feedburner_user_delete($edit, $account, $category);
+  }
+}
+
+/**
+ * Implementation of hook_user_update().
+ */
+function feedburner_user_update(&$edit, &$account, $category = NULL) {
+  if (isset($edit['feedburner_feedburner'])) {
+    feedburner_save(array('path' => $edit['feedburner_path'], 'feedburner' => $edit['feedburner_feedburner']));
     $edit['feedburner_path'] = NULL;
     $edit['feeedburner_feedburner'] = NULL;
   }
-  elseif ($type == 'delete') {
-    feedburner_save_feed("blog/{$account->uid}/feed");
-  }
+}
+
+/**
+ * Implementation of hook_user_delete().
+ */
+function feedburner_user_delete(&$edit, &$account, $category = NULL) {
+  feedburner_delete(array('path' => 'blog/'. $account->uid .'/feed'));
 }
 
 /**
@@ -270,18 +342,38 @@ function feedburner_theme() {
  * Implementation of hook_block().
  */
 function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
-  if ($op == 'list') {
-    $blocks[0]['info'] = t('FeedBurner FeedFlare');
-    $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
-    $blocks[1]['info'] = t('FeedBurner E-mail Subscribe');
-    $blocks[1]['cache'] = BLOCK_CACHE_GLOBAL;
-    $blocks[2]['info'] = t('FeedBurner FeedCount');
-    $blocks[2]['cache'] = BLOCK_CACHE_GLOBAL;
-    $blocks[3]['info'] = t('FeedBurner Feeds');
-    $blocks[3]['cache'] = BLOCK_CACHE_GLOBAL;
-    return $blocks;
+  switch ($op) {
+    case 'list':
+      return feedburner_block_list();
+    case 'configure':
+      return feedburner_block_configure($delta);
+    case 'save':
+      return feedburner_block_save($delta, $edit);
+    case 'view':
+      return feedburner_block_view($delta);
   }
-  elseif ($op == 'configure' && $delta == 1) {
+}
+
+/**
+ * Implementation of hook_block_list().
+ */
+function feedburner_block_list() {
+  $blocks[0]['info'] = t('FeedBurner FeedFlare');
+  $blocks[0]['cache'] = BLOCK_CACHE_PER_ROLE | BLOCK_CACHE_PER_PAGE;
+  $blocks[1]['info'] = t('FeedBurner E-mail Subscribe');
+  $blocks[1]['cache'] = BLOCK_CACHE_GLOBAL;
+  $blocks[2]['info'] = t('FeedBurner FeedCount');
+  $blocks[2]['cache'] = BLOCK_CACHE_GLOBAL;
+  $blocks[3]['info'] = t('FeedBurner Feeds');
+  $blocks[3]['cache'] = BLOCK_CACHE_GLOBAL;
+  return $blocks;
+}
+
+/**
+ * Implementation of hook_block_configure().
+ */
+function feedburner_block_configure($delta = 0) {
+  if ($delta == 1) {
     module_load_include('inc', 'feedburner', 'feedburner.admin');
     $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));
     $form['feed'] = array(
@@ -298,7 +390,7 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     );*/
     return $form;
   }
-  elseif ($op == 'configure' & $delta == 2) {
+  elseif ($delta == 2) {
     module_load_include('inc', 'feedburner', 'feedburner.admin');
     $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));
     $form['feed'] = array(
@@ -309,7 +401,13 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     );
     return $form;
   }
-  elseif ($op == 'save' && $delta == 1) {
+}
+
+/**
+ * Implementation of hook_block_save().
+ */
+function feedburner_block_save($delta = 0, $edit = array()) {
+  if ($delta == 1) {
     module_load_include('inc', 'feedburner', 'feedburner.admin');
     $feed_details = _feedburner_get_feed_features($edit['feed']);
     if ($edit['feed'] && !$feed_details->mail) {
@@ -318,39 +416,43 @@ function feedburner_block($op = 'list', $delta = 0, $edit = array()) {
     variable_set('feedburner_block_email_feed', $edit['feed']);
     //variable_set('feedburner_block_email_display', $edit['display']);
   }
-  elseif ($op == 'save' && $delta == 2) {
+  elseif ($delta == 2) {
     variable_set('feedburner_block_feedcount_feed', $edit['feed']);
   }
-  elseif ($op == 'view') {
-    $block = array();
-    switch ($delta) {
-      case 0:
-        if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2) == NULL) {
-          $node = node_load(arg(1));
-          if ($feedflare = _feedburner_get_feedflare_script($node)) {
-            $block['subject'] = t('FeedFlare');
-            $block['content'] = $feedflare;
-          }
+}
+
+/**
+ * Implementation of hook_block_view().
+ */
+function feedburner_block_view($delta = 0) {
+  $block = array();
+  switch ($delta) {
+    case 0:
+      if (arg(0) == 'node' && is_numeric(arg(1)) && arg(2) == NULL) {
+        $node = node_load(arg(1));
+        if ($feedflare = _feedburner_get_feedflare_script($node)) {
+          $block['subject'] = t('FeedFlare');
+          $block['content'] = $feedflare;
         }
-        break;
-      case 1:
-        if ($feed = feedburner_var('block_email_feed')) {
-          $block['subject']= t('Subscribe to @site-name by e-mail', array('@site-name' => variable_get('site_name', 'Drupal')));
-          $block['content'] = theme('feedburner_block_email', $feed);
-        }
-        break;
-      case 2:
-        if ($feed = feedburner_var('block_feedcount_feed')) {
-          $block['content'] = theme('feedburner_block_feedcount', $feed);
-        }
-        break;
-      case 3:
-        $block['subject'] = t('@sitename feeds', array('@sitename' => variable_get('site_name', 'Drupal')));
-        $block['content'] = theme('feedburner_block_feeds');
-        break;
-    }
-    return $block;
+      }
+      break;
+    case 1:
+      if ($feed = feedburner_var('block_email_feed')) {
+        $block['subject']= t('Subscribe to @site-name by e-mail', array('@site-name' => variable_get('site_name', 'Drupal')));
+        $block['content'] = theme('feedburner_block_email', $feed);
+      }
+      break;
+    case 2:
+      if ($feed = feedburner_var('block_feedcount_feed')) {
+        $block['content'] = theme('feedburner_block_feedcount', $feed);
+      }
+      break;
+    case 3:
+      $block['subject'] = t('@sitename feeds', array('@sitename' => variable_get('site_name', 'Drupal')));
+      $block['content'] = theme('feedburner_block_feeds');
+      break;
   }
+  return $block;
 }
 
 /**
@@ -368,10 +470,10 @@ function feedburner_check_redirect($path) {
 
   $skip_redirect = (isset($_GET['redirect']) && $_GET['redirect'] == 'no');
   $skip_useragents = preg_match(feedburner_var('useragents'), $_SERVER['HTTP_USER_AGENT']);
-  $feed = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
+  $feed = feedburner_load(array('path' => $path));
 
   if (!$skip_redirect && !$skip_useragents && $feed) {
-    $url = _feedburner_construct_url($feed);
+    $url = _feedburner_construct_url($feed->feedburner);
     $status = feedburner_var('redirect_status');
 
     // Need to make a condensed copy of drupal_goto since common.inc is not yet
@@ -386,32 +488,66 @@ function feedburner_check_redirect($path) {
 }
 
 /**
- * Saves or deletes a FeedBurner feed.
- *
- * @param $feed
- *   A string of the local site path.
- * @param $feed
- *   A string of the FeedBurner feed, or an empty value to remove it.
+ * Saves or updates a FeedBurner feed redirection.
  *
  * @todo Run verification on FeedBurner feed.
  */
-function feedburner_save_feed($path, $feedburner = NULL) {
-  $current = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
-
-  // @todo Check if '0' is a valid FeedBurner feed?
-  if (empty($feedburner)) {
-    db_query("DELETE FROM {feedburner} WHERE path = '%s'", $path);
-    if ($current == feedburner_var('feedflare_feed')) {
-      variable_set('feedburner_feedflare_feed', 0);
+function feedburner_save($edit) {
+  if (!isset($edit['feedburner']) || !strlen($edit['feedburner'])) {
+    feedburner_delete(array('path' => $edit['path']));
+  }
+  else {
+    if (feedburner_load(array('path' => $edit['path']))) {
+      drupal_write_record('feedburner', $edit, 'path');
+    }
+    else {
+      drupal_write_record('feedburner', $edit);
     }
   }
-  elseif ($current != $feedburner) {
-    $values = array('path' => $path, 'feedburner' => $feedburner);
-    drupal_write_record('feedburner', $values, ($current ? 'path' : array()));
+}
 
-    // @todo AddFeed / ModifyFeed Management API Calls
-    // if (_feedburner_can_api(TRUE)) {
-    // }
+/**
+ * Loads a FeedBurner feed.
+ *
+ * @param $where
+ *   An array of conditions.
+ * @param $args
+ *   An optional array of arguments.
+ * @return
+ *   An object with the FeedBurner feed.
+ */
+function feedburner_load($where, $args = array()) {
+  foreach ($where as $key => &$value) {
+    if (is_string($key)) {
+      $args[] = $value;
+      $value = $key .' = '. (is_numeric($value) ? '%d' : "'%s'");
+    }
+  }
+
+  if ($where && $args) {
+    $sql = "SELECT * FROM {feedburner} WHERE ". implode(' AND ', $where);
+    return db_fetch_object(db_query_range($sql, $args, 0, 1));
+  }
+}
+
+/**
+ * Deletes a FeedBurner feed.
+ *
+ * @param $where
+ *   An array of conditions.
+ * @param $args
+ *   An optional array of arguments.
+ */
+function feedburner_delete($where, $args = array()) {
+  foreach ($where as $key => &$value) {
+    if (is_string($value)) {
+      $args[] = $value;
+      $value = $key .' = '. (is_numeric($value) ? '%d' : "'%s'");
+    }
+  }
+
+  if ($where && $args) {
+    return db_query("DELETE FROM {feedburner} WHERE ". implode(' AND ', $where), $args);
   }
 }
 
@@ -478,19 +614,16 @@ function _feedburner_can_api($valid_account = FALSE) {
  *   $pos = 2, returns 'foobar/ferzle'
  *   $pos = 4, returns ''
  *
- * @param $pos
+ * @param $index
  *   The argument of the path to start at, use 0 to get the whole path
  * @return
  *   The extracted part of the path
  */
-function _feedburner_get_path($pos = 0) {
-  //drupal_bootstrap(DRUPAL_BOOTSTRAP_PATH);
-  $path = str_replace(' ', '+', $_GET['q']);
-  if ($pos > 0) {
-    $path = explode('/', $path, $pos);
-    $path = (count($path) >= $pos ? end($path) : '');
-  }
-  return trim($path);
+function _feedburner_get_path_segment($index = 0) {
+  $path = str_replace(' ', '+', trim($_GET['q']));
+  $path = explode('/', $path, $index + 1);
+  $path = (count($path) > $index ? end($path) : '');
+  return $path;
 }
 
 /**
@@ -498,11 +631,24 @@ function _feedburner_get_path($pos = 0) {
  */
 function _feedburner_get_feed_categories() {
   return array(
-    'site' => array('default' => TRUE),
-    'blogs' => array('module' => 'blog'),
-    'taxonomy' => array('module' => 'taxonomy'),
-    'organic groups' => array('module' => 'og'),
-    //'views' => array('module' => 'views'),
+    'site' => array(
+      'default' => TRUE,
+      'access' => TRUE,
+    ),
+    'blog' => array(
+      'access' => module_exists('blog'),
+      'title' => t('Blogs'),
+    ),
+    'taxonomy' => array(
+      'access' => module_exists('taxonomy'),
+    ),
+    'og' => array(
+      'access' => module_exists('og') && module_exists('og_views'),
+      'title' => t('Organic groups'),
+    ),
+    'views' => array(
+      'access' => module_exists('views'),
+    ),
   );
 }
 
@@ -526,7 +672,7 @@ function _feedburner_get_feedflare_script($node) {
 }
 
 /**
- * Internal default variables for admin_links_var().
+ * Internal default variables for feedburner_var().
  */
 function feedburner_variables() {
   return array(
@@ -562,6 +708,7 @@ function feedburner_var($name, $default = NULL) {
   $name = 'feedburner_'. $name;
 
   if (!isset($defaults[$name])) {
+    drupal_set_message(t('Default variable for %variable not found.', array('%variable' => $name)), 'error');
     watchdog('feedburner', 'Default variable for %variable not found.', array('%variable' => $name), WATCHDOG_WARNING);
   }
 
