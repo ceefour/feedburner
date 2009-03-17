@@ -517,10 +517,10 @@ function feedburner_save($edit) {
  *   An object with the FeedBurner feed.
  */
 function feedburner_load($where, $args = array()) {
-  foreach ($where as $key => &$value) {
+  foreach ($where as $key => $value) {
     if (is_string($key)) {
       $args[] = $value;
-      $value = $key .' = '. (is_numeric($value) ? '%d' : "'%s'");
+      $where[$key] = $key .' = '. (is_numeric($value) ? '%d' : "'%s'");
     }
   }
 
@@ -539,10 +539,10 @@ function feedburner_load($where, $args = array()) {
  *   An optional array of arguments.
  */
 function feedburner_delete($where, $args = array()) {
-  foreach ($where as $key => &$value) {
+  foreach ($where as $key => $value) {
     if (is_string($value)) {
       $args[] = $value;
-      $value = $key .' = '. (is_numeric($value) ? '%d' : "'%s'");
+      $where[$key] = $key .' = '. (is_numeric($value) ? '%d' : "'%s'");
     }
   }
 
@@ -708,8 +708,7 @@ function feedburner_var($name, $default = NULL) {
   $name = 'feedburner_'. $name;
 
   if (!isset($defaults[$name])) {
-    drupal_set_message(t('Default variable for %variable not found.', array('%variable' => $name)), 'error');
-    watchdog('feedburner', 'Default variable for %variable not found.', array('%variable' => $name), WATCHDOG_WARNING);
+    trigger_error(t('Default variable for %variable not found.', array('%variable' => $name)));
   }
 
   return variable_get($name, isset($default) || !isset($defaults[$name]) ? $default : $defaults[$name]);

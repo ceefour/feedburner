@@ -23,7 +23,7 @@ function feedburner_build_overview($category) {
   $rows = array();
   foreach ($feeds as $feed) {
     $row = array();
-    $row[] = l($feed['alias'], $feed['path'], array('attributes' => array('alt' => $feed['description'], 'title' => $feed['description'])));
+    $row[] = l($feed['alias'], $feed['alias'], array('alias' => TRUE, 'attributes' => array('alt' => $feed['description'], 'title' => $feed['description'])));
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
       $row[] = l(t('Edit'), 'admin/build/feedburner/burn/'. $feed['path']);
