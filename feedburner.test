@@ -80,33 +80,38 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
    */
   function testBlogFeedRedirection() {
     $blog_user = $this->drupalCreateUser(array('create blog entries', 'add FeedBurner feed to own blog'));
+    $blog_user_feed = 'blog/'. $blog_user->uid . '/feed';
+    $blog_user_edit = 'user/'. $blog_user->uid . '/edit';
+
     $this->drupalLogin($blog_user);
 
     // Add an invalid blog feed redirection.
     $values = array('feedburner_feedburner' => 'invalid_feed!');
-    $this->drupalPost("user/{$blog_user->uid}/edit", $values, t('Save'));
+    $this->drupalPost($blog_user_edit, $values, t('Save'));
     $this->assertText(t('Invalid FeedBurner feed name.'), t('Invalid FeedBurner feed name caught.'));
 
     // Add a valid blog feed redirection.
     $values = array('feedburner_feedburner' => 'example-feed');
-    $this->drupalPost("user/{$blog_user->uid}/edit", $values, t('Save'));
+    $this->drupalPost($blog_user_edit, $values, t('Save'));
     $this->assertText(t('The changes have been saved.'), t('Blog feed updated.'));
 
     // Test that the blog feed is now redirected.
-    $this->assertRedirected("blog/{$blog_user->uid}/feed", t('Blog feed redirected.'));
+    $this->assertTrue(feedburner_load(array('path' => $blog_user_feed)), t('Record removed from database.'));
+    $this->assertRedirected($blog_user_feed, t('Blog feed redirected.'));
 
     // Remove the blog feed redirection.
     $values = array('feedburner_feedburner' => '');
-    $this->drupalPost("user/{$blog_user->uid}/edit", $values, t('Save'));
+    $this->drupalPost($blog_user_edit, $values, t('Save'));
     $this->assertText(t('The changes have been saved.'), t('Blog feed updated to blank value.'));
 
     // Test that the blog feed is no longer redirected.
-    $this->assertNotRedirected("blog/{$blog_user->uid}/feed", t('Blog feed not redirected.'));
+    $this->assertFalse(feedburner_load(array('path' => $blog_user_feed)), t('Record removed from database.'));
+    $this->assertNotRedirected($blog_user_feed, t('Blog feed not redirected.'));
 
     // Test that a user without permission cannot access the form field.
     $no_blog_user = $this->drupalCreateUser(array('add FeedBurner feed to own blog'));
     $this->drupalLogin($no_blog_user);
-    $this->drupalGet("user/{$no_blog_user->uid}/edit");
+    $this->drupalGet('user/'. $no_blog_user->uid . '/edit');
     $this->assertNoFieldByName('feedburner_feedburner');
   }
 

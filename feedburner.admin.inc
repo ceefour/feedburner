@@ -237,6 +237,7 @@ function feedburner_settings_form() {
     '#title' => t('Replace all links to burned FeedBurner feeds in the source HTML.'),
     '#default_value' => feedburner_var('replace_html'),
     '#description' => t('This option is currently experimental, but should work just fine.'),
+    '#disabled' => TRUE,
   );
 
   $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));

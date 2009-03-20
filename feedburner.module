@@ -469,7 +469,7 @@ function feedburner_check_redirect($path) {
   }
 
   $skip_redirect = (isset($_GET['redirect']) && $_GET['redirect'] == 'no');
-  $skip_useragents = preg_match(feedburner_var('useragents'), $_SERVER['HTTP_USER_AGENT']);
+  $skip_useragents = isset($_SERVER['HTTP_USER_AGENT']) ? preg_match(feedburner_var('useragents'), $_SERVER['HTTP_USER_AGENT']) : FALSE;
   $feed = feedburner_load(array('path' => $path));
 
   if (!$skip_redirect && !$skip_useragents && $feed) {
