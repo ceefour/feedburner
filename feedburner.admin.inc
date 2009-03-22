@@ -236,9 +236,12 @@ function feedburner_settings_form() {
     '#type' => 'checkbox',
     '#title' => t('Replace all links to burned FeedBurner feeds in the source HTML.'),
     '#default_value' => feedburner_var('replace_html'),
-    '#description' => t('This option is currently experimental, but should work just fine.'),
-    '#disabled' => TRUE,
+    '#description' => t('This option is currently experimental.') .' '. t('This option requires that <a href="@clean-url">Clean URLs</a> are enabled along with the <a href="@url-alter">Url alter module</a>.', array('@clean-url' => url('admin/settings/clean-urls'), '@url-alter' => 'http://drupal.org/project/url_alter')),
+    '#disabled' => !variable_get('clean_url', 0) || (url('feedburner/url-rewrite-test') && !defined('FEEDBURNER_CUSTOM_URL_REWRITE_OUTBOUND')),
   );
+  //if (module_exists('advanced_help') && FALSE) {
+  //  $form['general']['feedburner_replace_html']['#description'] .= ' '. theme('advanced_help_topic', 'feedburner', 'settings-replace-links', t('[more help]'));
+  //}
 
   $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));
   $form['feedflare'] = array(

@@ -121,51 +121,53 @@ function feedburner_boot() {
 /**
  * Implementation of hook_url_alter_outbound() from the url_alter module.
  */
-/*function feedburner_url_alter_outbound(&$path, &$options, $original_path) {
-  if (!preg_match('/^admin\/?|^node\/\d+\/?$/i', $path)) {
-    if ($result = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", array(':path' => $path)))) {
-      $path = _feedburner_contstruct_url($result);
-      $options['external'] = TRUE;
+function feedburner_url_alter_outbound(&$path, &$options, $original_path) {
+  static $feeds;
+  
+  if ($original_path == 'feedburner/url-rewrite-test') {
+    // Create a define that can be checked in admin/build/feedburner/settings.
+    define('FEEDBURNER_CUSTOM_URL_REWRITE_OUTBOUND', TRUE);
+    return;
+  }
+
+  if (feedburner_var('replace_html') && variable_get('clean_url', 0) && !preg_match('/^admin\/?|^node\/\d+\/?$/i', $original_path)) {
+  // Perform URL replacement.
+
+    if (!isset($feeds)) {
+      // Store a static list of all current FeedBurner feeds.
+      $query = db_query("SELECT path, feedburner FROM {feedburner}");
+      while ($feed = db_fetch_object($query)) {
+        $feeds[$feed->path] = $feed->feedburner;
+      }
+    }
+
+    // If $path is aliased, get the normal path.
+    if (!empty($options['alias'])) {
+      $original_path = drupal_get_normal_path($original_path);
+    }
+
+    if (!empty($feeds[$original_path])) {
+      $path = $feeds[$original_path];
+      $options['absolute'] = TRUE;
+      $options['base_url'] = 'http://'. feedburner_var('domain');
+      //$path = _feedburner_construct_url($feeds[$original_path]);
+      //$options['external'] = TRUE;
     }
   }
-}*/
+}
 
 /**
- * Implementation of hook_init().
+ * Implementation of custom_url_rewrite_outbound().
+ *
+ * This function will only work if custom_url_rewrite_outbound is not already
+ * defined, or the url_alter module is not enabled (might work for a majority
+ * of sites).
  */
-/*function feedburner_init() {
-  if (feedburner_var('replace_html')) {
-    // Start another output buffer so we can catch it in feedburner_exit().
-    ob_start();
+if (!function_exists('custom_url_rewrite_outbound')) {
+  function custom_url_rewrite_outbound(&$path, &$options, $original_path) {
+    feedburner_url_alter_outbound($path, $options, $original_path);
   }
-}*/
-
-/**
- * Implementation of hook_exit().
- */
-/*function feedburner_exit() {
-  // Replace any links to original feed URLs with their FeedBurner equivalents.
-  if (feedburner_var('replace_html') && ob_get_level()) {
-    // Get the current output and clean the output buffer.
-    $data = ob_get_contents();
-    ob_end_clean();
-
-    // Replace feed URLs with FeedBurner feed URLs.
-    $changed = _feedburner_replace_feed_html($data);
-
-    // If the page has been changed and caching is enabled, start a new output
-    // buffer and save the new version to the cache. If nothing has changed,
-    // simply output the page content.
-    if ($changed && variable_get('cache', CACHE_DISABLED) != CACHE_DISABLED && page_get_cache(TRUE)) {
-      ob_start();
-      echo $data;
-      page_set_cache();
-    }
-    else {
-      echo $data;
-    }
-  }
-}*/
+}
 
 /**
  * Implementation of hook_nodeapi().
