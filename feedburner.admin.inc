@@ -178,7 +178,7 @@ function feedburner_unburn_form() {
   $path = _feedburner_get_path_segment(5);
   $feed = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
 
-  if (empty($path) || empty($feed)) {
+  if (empty($path) || $feed === FALSE) {
     drupal_goto('admin/build/feedburner');
   }
 
@@ -190,15 +190,12 @@ function feedburner_unburn_form() {
   // TODO: Implement Management API DeleteFeed
   //$form['unburn'] = array(
   //  '#type' => 'checkbox',
-  //  '#title' => t('Delete the FeedBurner feed %feed from my FeedBurner account.', array('%feed' => $feed->fb_uri)),
+  //  '#title' => t('Delete the FeedBurner feed %feed from my FeedBurner account.', array('%feed' => $feed)),
   //  '#default_value' => FALSE,
   //  '#disabled' => TRUE,
   //  '#description' => t('FeedBurner Management API features coming soon.'),
+  //  '#access' => $feed && _feedburner_can_api(TRUE),
   //);
-  //
-  //if (!_feedburner_can_api(TRUE)) {
-  //  $form['unburn']['#disabled'] = TRUE;
-  //}
 
   $form['#redirect'] = 'admin/build/feedburner';
 
@@ -207,13 +204,11 @@ function feedburner_unburn_form() {
 
 function feedburner_unburn_form_submit($form, &$form_state) {
   if ($form_state['values']['confirm']) {
-    //if (isset($form_state['values']['unburn'])) {
-    //  // TODO: Implement Management API DeleteFeed
-    //}
+    if ($form_state['values']['unburn']) {
+      // TODO: Implement Management API DeleteFeed
+    }
     feedburner_delete(array('path' => $form_state['values']['path']));
     drupal_set_message(t('Redirection for %url has been removed.', array('%url' => $form_state['values']['path'])));
-    $form_state['redirect'] = 'admin/build/feedburner';
-    return;
   }
 }
 
