@@ -10,7 +10,7 @@
  * Test basic functionality.
  */
 class FeedBurnerTestCase extends DrupalWebTestCase {
-  function getInfo() {
+  public static function getInfo() {
     return array(
       'name' => t('FeedBurner functionality'),
       'description' => t('Test basic FeedBurner module functionality.'),
@@ -161,7 +161,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
  * Test administration functionality.
  */
 class FeedBurnerAdminTestCase extends DrupalWebTestCase {
-  function getInfo() {
+  public static function getInfo() {
     return array(
       'name' => t('FeedBurner administration'),
       'description' => t('Test FeedBurner module administration.'),
