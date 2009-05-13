@@ -94,8 +94,8 @@ function feedburner_menu() {
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
   );
-  $items['admin/build/feedburner/autocomplete'] = array(
-    'page callback' => 'feedburner_admin_build_autocomplete',
+  $items['js/feedburner/autocomplete'] = array(
+    'page callback' => 'feedburner_autocomplete',
     'type' => MENU_CALLBACK,
     'access arguments' => array('administer FeedBurner'),
     'file' => 'feedburner.admin.inc',
