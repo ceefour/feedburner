@@ -121,7 +121,7 @@ function feedburner_boot() {
 /**
  * Implementation of hook_url_alter_outbound() from the url_alter module.
  */
-function feedburner_url_alter_outbound(&$path, &$options, $original_path) {
+function feedburner_url_outbound_alter(&$path, &$options, $original_path) {
   static $feeds;
   
   if ($original_path == 'feedburner/url-rewrite-test') {
@@ -165,7 +165,7 @@ function feedburner_url_alter_outbound(&$path, &$options, $original_path) {
  */
 if (!function_exists('custom_url_rewrite_outbound')) {
   function custom_url_rewrite_outbound(&$path, &$options, $original_path) {
-    feedburner_url_alter_outbound($path, $options, $original_path);
+    feedburner_url_outbound_alter($path, $options, $original_path);
   }
 }
 
