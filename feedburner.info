@@ -1,4 +1,3 @@
-; $Id$
 name = Feedburner
 description = "Integrates with FeedBurner services, primarily feed redirection."
 core = 6.x
