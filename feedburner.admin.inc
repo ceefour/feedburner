@@ -259,7 +259,7 @@ function feedburner_settings_form() {
     '#type' => 'checkboxes',
     '#title' => t('Display in node types'),
     '#default_value' => feedburner_var('feedflare_node_types'),
-    '#options' => node_type_get_name(),
+    '#options' => node_type_get_names(),
   );
   // @todo Find a better way to list node display types?
   $form['feedflare']['feedburner_feedflare_display'] = array(
@@ -692,6 +692,13 @@ function _feedburner_process_feed_list($feeds, $options = array()) {
       }
     }
     $feeds[$key] = $feed;
+  }
+
+  // Set description index for ones that don't have it
+  foreach ($feeds as $key => $feed) {
+    if (!isset($feed['description'])) {
+      $feeds[$key]['description'] = '';
+    }
   }
 
   return $feeds;
