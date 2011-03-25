@@ -26,13 +26,13 @@ function feedburner_build_overview($category) {
     $row[] = l($feed['alias'], $feed['alias'], array('alias' => TRUE, 'attributes' => array('alt' => $feed['description'], 'title' => $feed['description'])));
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
-      $row[] = l(t('Edit'), 'admin/build/feedburner/burn/' . $feed['path']);
-      $row[] = l(t('Unburn'), 'admin/build/feedburner/unburn/' . $feed['path']);
+      $row[] = l(t('Edit'), 'admin/structure/feedburner/burn/' . $feed['path']);
+      $row[] = l(t('Unburn'), 'admin/structure/feedburner/unburn/' . $feed['path']);
       $row[] = l(t('Source'), $feed['path'], array('query' => array('redirect' => 'no')));
     }
     else {
       $row[] = '';
-      $row[] = l(t('Burn'), 'admin/build/feedburner/burn/' . $feed['path']);
+      $row[] = l(t('Burn'), 'admin/structure/feedburner/burn/' . $feed['path']);
       $row[] = '';
       $row[] = '';
     }
@@ -105,27 +105,24 @@ function feedburner_build_filter_form($form, &$form_state, $category, $keys = ''
  * Process filter form submission when the Filter button is pressed.
  */
 function _feedburner_build_filter_form_submit_filter($form, &$form_state) {
-  $form_state['redirect'] = 'admin/build/feedburner/list/' . $form_state['values']['category'] . '/' . trim($form_state['values']['filter']);
+  $form_state['redirect'] = 'admin/structure/feedburner/list/' . $form_state['values']['category'] . '/' . trim($form_state['values']['filter']);
 }
 
 /**
  * Process filter form submission when the Reset button is pressed.
  */
 function feedburner_build_filter_form_submit_reset($form, &$form_state) {
-  $form_state['redirect'] = 'admin/build/feedburner/list/' . $form_state['values']['category'];
+  $form_state['redirect'] = 'admin/structure/feedburner/list/' . $form_state['values']['category'];
 }
 
 
 function feedburner_burn_form() {
   $path = _feedburner_get_path_segment(4);
-  $result = db_select('feedburner', 'f')
+  $feedburner = db_select('feedburner', 'f')
     ->fields('f', array('feedburner'))
     ->condition('path', $path)
-    ->execute();
-  foreach ($result as $feed) {
-    
-  }
-  
+    ->execute()
+    ->fetch();
 
   $form['path'] = array(
     '#type' => 'textfield',
@@ -158,8 +155,8 @@ function feedburner_burn_form() {
   // TODO: Feed Management API Options
 
   $form['submit'] = array('#type' => 'submit', '#value' => t('Save'));
-  $form['cancel'] = array('#value' => l(t('Cancel'), 'admin/build/feedburner'));
-  $form['#redirect'] = 'admin/build/feedburner';
+  $form['cancel'] = array('#value' => l(t('Cancel'), 'admin/structure/feedburner'));
+  $form['#redirect'] = 'admin/structure/feedburner';
 
   return $form;
 }
@@ -181,12 +178,12 @@ function feedburner_burn_form_submit($form, &$form_state) {
 }
 
 
-function feedburner_unburn_form() {
+function feedburner_unburn_form($form, &$form_state) {
   $path = _feedburner_get_path_segment(4);
-  $feed = db_select('feedburner', 'f')->fields('f', 'feedburner')->condition('path', $path)->execute()->fetch();
+  $feed = db_select('feedburner', 'f')->fields('f', array('feedburner'))->condition('path', $path)->execute()->fetch();
 
   if (empty($path) || $feed === FALSE) {
-    drupal_goto('admin/build/feedburner');
+    drupal_goto('admin/structure/feedburner');
   }
 
   $form['path'] = array(
@@ -204,9 +201,9 @@ function feedburner_unburn_form() {
   //  '#access' => $feed && _feedburner_can_api(TRUE),
   //);
 
-  $form['#redirect'] = 'admin/build/feedburner';
+  $form['#redirect'] = 'admin/structure/feedburner';
 
-  return confirm_form($form, t('Are you sure you want to unburn %feed?', array('%feed' => $path)), 'admin/build/feedburner', t('Requests for this feed will no longer be redirected to FeedBurner. But don\'t worry, you can always re-burn this feed to FeedBurner.'));
+  return confirm_form($form, t('Are you sure you want to unburn %feed?', array('%feed' => $path)), 'admin/structure/feedburner', t('Requests for this feed will no longer be redirected to FeedBurner. But don\'t worry, you can always re-burn this feed to FeedBurner.'));
 }
 
 function feedburner_unburn_form_submit($form, &$form_state) {
@@ -273,7 +270,7 @@ function feedburner_settings_form() {
       'teaser' => t('Teaser view'),
       'page' => t('Full-page view'),
     ),
-    '#description' => t('When to display the FeedFlare after the node text. There is also a <a href="@block">FeedFlare block available</a>.', array('@block' => url('admin/build/block/configure/feedburner/0'))),
+    '#description' => t('When to display the FeedFlare after the node text. There is also a <a href="@block">FeedFlare block available</a>.', array('@block' => url('admin/structure/block/configure/feedburner/0'))),
   );
   //$form['feedflare']['feedburner_standardstats'] = array(
   //  '#type' => 'checkbox',

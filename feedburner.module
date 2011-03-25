@@ -12,11 +12,11 @@ function feedburner_help($path, $arg) {
   switch ($path) {
     // case 'admin/help#feedburner':
     //  return '';
-    //case 'admin/build/feedburner':
+    //case 'admin/structure/feedburner':
     //  $output = '<p>'. t("This is the FeedBurner site feed redirection building page. Make sure to check out the <a href=\"@settings-link\">FeedBurner settings</a>.", array('@settings-link' => url('admin/settings/feedburner'))) .'</p>';
     //  return $output;
     //case 'admin/settings/feedburner':
-    //  $output = '<p>'. t("These are the settings for the FeedBurner module. Once you have everything set, check out your site's <a href=\"@build-link\">FeedBurner feeds</a>.", array('@build-link' => url('admin/build/feedburner'))) .'</p>';
+    //  $output = '<p>'. t("These are the settings for the FeedBurner module. Once you have everything set, check out your site's <a href=\"@build-link\">FeedBurner feeds</a>.", array('@build-link' => url('admin/structure/feedburner'))) .'</p>';
     //  return $output;
   }
 }
@@ -133,7 +133,7 @@ function feedburner_url_outbound_alter(&$path, &$options, $original_path) {
   static $feeds;
 
   if ($original_path == 'feedburner/url-rewrite-test') {
-    // Create a define that can be checked in admin/build/feedburner/settings.
+    // Create a define that can be checked in admin/structure/feedburner/settings.
     define('FEEDBURNER_CUSTOM_URL_REWRITE_OUTBOUND', TRUE);
     return;
   }
@@ -511,7 +511,7 @@ function feedburner_load($where, $args = array()) {
  *   An optional array of arguments.
  */
 function feedburner_delete($where, $args = array()) {
-  if ($where && $args) {
+  if ($where) {
     $query = db_delete('feedburner');
     foreach ($where as $key => $value) {
       $query->condition($key, $value);
