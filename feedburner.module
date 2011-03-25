@@ -36,7 +36,7 @@ function feedburner_permission() {
     ),
     'add feedburner feed to own blog' => array(
       'title' => t('Add Feedburner to own blog'),
-      'description' => t('Add Feedburner to own blog.')
+      'description' => t('Add Feedburner feed to own blog.')
     ),
   );
 }
@@ -50,7 +50,7 @@ function feedburner_menu() {
     'description' => 'Change site feed redirections to FeedBurner.',
     'page callback' => 'feedburner_build_overview',
     'page arguments' => array('site'),
-    'access arguments' => array('administer FeedBurner'),
+    'access arguments' => array('administer feedburner'),
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/structure/feedburner/list'] = array(
@@ -72,7 +72,7 @@ function feedburner_menu() {
         'weight' => $category_options['default'] ? -10 : 0,
         'page callback' => 'feedburner_build_overview',
         'page arguments' => array($category_key),
-        'access arguments' => array('administer FeedBurner'),
+        'access arguments' => array('administer feedburner'),
         'file' => 'feedburner.admin.inc',
       );
     }
@@ -82,7 +82,7 @@ function feedburner_menu() {
     'type' => MENU_LOCAL_TASK,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_burn_form'),
-    'access arguments' => array('administer FeedBurner'),
+    'access arguments' => array('administer feedburner'),
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/structure/feedburner/unburn'] = array(
@@ -90,7 +90,7 @@ function feedburner_menu() {
     'type' => MENU_CALLBACK,
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_unburn_form'),
-    'access arguments' => array('administer FeedBurner'),
+    'access arguments' => array('administer feedburner'),
     'file' => 'feedburner.admin.inc',
   );
   $items['admin/structure/feedburner/settings'] = array(
@@ -99,13 +99,13 @@ function feedburner_menu() {
     'description' => 'Change settings for FeedBurner.',
     'page callback' => 'drupal_get_form',
     'page arguments' => array('feedburner_settings_form'),
-    'access arguments' => array('administer FeedBurner'),
+    'access arguments' => array('administer feedburner'),
     'file' => 'feedburner.admin.inc',
   );
   $items['js/feedburner/autocomplete'] = array(
     'page callback' => 'feedburner_autocomplete',
     'type' => MENU_CALLBACK,
-    'access arguments' => array('administer FeedBurner'),
+    'access arguments' => array('administer feedburner'),
     'file' => 'feedburner.admin.inc',
   );
   $items['feedburner/feedflare'] = array(
@@ -276,7 +276,7 @@ function feedburner_user_delete(&$edit, &$account, $category = NULL) {
 function feedburner_form_user_profile_form_alter(&$form, $form_state) {
   if ($form['_category']['#value'] == 'account') {
     $account = $form['_account']['#value'];
-    if (user_access('create blog entries', $account) && user_access('add FeedBurner feed to own blog', $account)) {
+    if (user_access('create blog entries', $account) && user_access('add feedburner feed to own blog', $account)) {
       $user_blog_feed = "blog/{$account->uid}/feed";
       if (!isset($form['blog'])) {
         $form['blog'] = array(
