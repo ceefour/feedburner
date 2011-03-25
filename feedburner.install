@@ -53,19 +53,19 @@ function feedburner_requirements($phase) {
  */
 function feedburner_schema() {
   $schema['feedburner'] = array(
-    'description' => t('Stores information on FeedBurner feed redirections.'),
+    'description' => 'Stores information on FeedBurner feed redirections.',
     'fields' => array(
       'path' => array(
         'type' => 'varchar',
         'length' => 128,
         'not null' => TRUE,
-        'description' => t('The source feed.'),
+        'description' => 'The source feed.',
       ),
       'feedburner' => array(
         'type' => 'varchar',
         'length' => 100,
         'not null' => TRUE,
-        'description' => t('FeedBurner feed.'),
+        'description' => 'FeedBurner feed.',
       ),
     ),
     'primary key' => array('path'),

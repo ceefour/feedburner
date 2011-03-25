@@ -33,7 +33,7 @@ function feedburner_feedflare($feedflare) {
       }
   }
 
-  drupal_set_header('Content-Type: application/xml; charset=utf-8');
+  drupal_add_http_header('Content-Type', 'application/xml; charset=utf-8');
   print $output;
 }
 

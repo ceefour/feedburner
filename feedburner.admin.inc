@@ -7,8 +7,9 @@
 
 function feedburner_build_overview($category) {
   $keys = _feedburner_get_path_segment(5);
-  $output = drupal_get_form('feedburner_build_filter_form', $category, $keys);
-
+  $build_filter_form = drupal_get_form('feedburner_build_filter_form', $category, $keys);
+  
+  $output = render($build_filter_form);
   $header = array(
     array('data' => t('Local path')),
     array('data' => t('FeedBurner')),
@@ -27,7 +28,7 @@ function feedburner_build_overview($category) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
       $row[] = l(t('Edit'), 'admin/build/feedburner/burn/' . $feed['path']);
       $row[] = l(t('Unburn'), 'admin/build/feedburner/unburn/' . $feed['path']);
-      $row[] = l(t('Source'), $feed['path'], array('query' => 'redirect=no'));
+      $row[] = l(t('Source'), $feed['path'], array('query' => array('redirect' => 'no')));
     }
     else {
       $row[] = '';
@@ -43,8 +44,8 @@ function feedburner_build_overview($category) {
     $rows[] = array(array('data' => $empty_message, 'colspan' => 5));
   }
 
-  $output .= theme('table', $header, $rows);
-  $output .= theme('pager', NULL, $row_limit);
+  $output .= theme('table', array('header' => $header, 'rows' => $rows));
+  $output .= theme('pager', array('limit' => $row_limit));
   return $output;
 }
 
@@ -64,7 +65,7 @@ function _feedburner_build_pager($array, $limit = 10) {
 /**
  * Return a form to filter URL aliases.
  */
-function feedburner_build_filter_form(&$form_state, $category, $keys = '') {
+function feedburner_build_filter_form($form, &$form_state, $category, $keys = '') {
   $form['#attributes'] = array('class' => 'search-form');
   $form['basic'] = array(
     '#type' => 'fieldset',
@@ -84,7 +85,7 @@ function feedburner_build_filter_form(&$form_state, $category, $keys = '') {
   $form['basic']['inline']['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Filter'),
-    '#submit' => array('feedburner_build_filter_form_submit_filter'),
+    '#submit' => array('_feedburner_build_filter_form_submit_filter'),
   );
   $form['category'] = array(
     '#type' => 'value',
@@ -103,7 +104,7 @@ function feedburner_build_filter_form(&$form_state, $category, $keys = '') {
 /**
  * Process filter form submission when the Filter button is pressed.
  */
-function feedburner_build_filter_form_submit_filter($form, &$form_state) {
+function _feedburner_build_filter_form_submit_filter($form, &$form_state) {
   $form_state['redirect'] = 'admin/build/feedburner/list/' . $form_state['values']['category'] . '/' . trim($form_state['values']['filter']);
 }
 
@@ -117,7 +118,14 @@ function feedburner_build_filter_form_submit_reset($form, &$form_state) {
 
 function feedburner_burn_form() {
   $path = _feedburner_get_path_segment(4);
-  $feedburner = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
+  $result = db_select('feedburner', 'f')
+    ->fields('f', array('feedburner'))
+    ->condition('path', $path)
+    ->execute();
+  foreach ($result as $feed) {
+    
+  }
+  
 
   $form['path'] = array(
     '#type' => 'textfield',
@@ -230,7 +238,7 @@ function feedburner_settings_form() {
     '#type' => 'checkbox',
     '#title' => t('Replace all links to burned FeedBurner feeds in the source HTML.'),
     '#default_value' => feedburner_var('replace_html'),
-    '#description' => t('This option is currently experimental.') . ' ' . t('This option requires that <a href="@clean-url">Clean URLs</a> are enabled along with the <a href="@url-alter">Url alter module</a>.', array('@clean-url' => url('admin/settings/clean-urls'), '@url-alter' => 'http://drupal.org/project/url_alter')),
+    '#description' => t('This option is currently experimental.') . ' ' . t('This option requires that <a href="@clean-url">Clean URLs</a> are enabled along with the <a href="@url-alter">Url alter module</a>.', array('@clean-url' => url('admin/settings/clean-urls'), '@url-alter' => 'http://drupal.org/project/url_alter'), array('locale' => 'en')),
     '#disabled' => !variable_get('clean_url', 0) || (url('feedburner/url-rewrite-test') && !defined('FEEDBURNER_CUSTOM_URL_REWRITE_OUTBOUND')),
   );
   //if (module_exists('advanced_help') && FALSE) {
@@ -254,7 +262,7 @@ function feedburner_settings_form() {
     '#type' => 'checkboxes',
     '#title' => t('Display in node types'),
     '#default_value' => feedburner_var('feedflare_node_types'),
-    '#options' => node_get_types('names'),
+    '#options' => node_type_get_name(),
   );
   // @todo Find a better way to list node display types?
   $form['feedflare']['feedburner_feedflare_display'] = array(
@@ -297,7 +305,7 @@ function feedburner_settings_form() {
   //);
   //$form['account']['verified'] = array(
   //  '#type' => 'markup',
-  //  '#value' => '<p><strong>' . t('Account status:') . '</strong><br /><span style="color: ' . ($auth ? 'green">' . t('Verified') : 'red">' . t('NOT VERIFIED')) . '</span></p>',
+  //  '#value' => filter_xss('<p><strong>' . t('Account status:') . '</strong><br /><span style="color: ' . ($auth ? 'green">' . t('Verified') : 'red">' . t('NOT VERIFIED')) . '</span></p>'),
   //);
   //
   //if (!_feedburner_can_api()) {
@@ -442,8 +450,11 @@ function _feedburner_get_blog_feeds(&$feeds) {
  * Get a list of taxonomy feeds.
  */
 function _feedburner_get_taxonomy_feeds(&$feed) {
-  $query = db_query('SELECT tid, name FROM {term_data}');
-  while ($term = db_fetch_object($query)) {
+  //$query = db_query('SELECT tid, name FROM {taxonomy_term_data}');
+  $result = db_select('taxonomy_term_data', 'ttd')
+    ->fields('ttd')
+    ->execute();
+  foreach ($result as $term) {
     $feeds[] = array(
       'path' => 'taxonomy/term/' . $term->tid . '/0/feed',
       'description' => $term->name,
@@ -455,7 +466,7 @@ function _feedburner_get_taxonomy_feeds(&$feed) {
  * Get a list of organic gropus feeds.
  */
 function _feedburner_get_og_feeds(&$feeds) {
-  /*$feeds[] = array(
+  /* $feeds[] = array(
     'path' => 'og/all/feed',
     'description' => t('Groups'),
   );
@@ -476,8 +487,8 @@ function _feedburner_get_og_feeds(&$feeds) {
   // D6
   // $query = db_query("SELECT n.nid, n.title FROM {og} og LEFT JOIN {node} n USING (nid)");
   $result = db_select('og', 'og')
-    ->leftJoin('n', 'node', 'og.nid = n.nid'),
-    ->fields('n', array('nid', 'title')),
+    ->leftJoin('n', 'node', 'og.nid = n.nid')
+    ->fields('n', array('nid', 'title'))
     ->execute();
   foreach ($result as $group) {
     $feeds[] = array(
@@ -511,7 +522,11 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
   // TODO: Fetch FeedBurner feeds from FeedManagement API
   if ($category == 'feedburner' || $options['feedburner']) {
     $query = db_query("SELECT path, feedburner FROM {feedburner}");
-    while ($feedburner_feed = db_fetch_array($query)) {
+    $result = db_select('feedburner', 'f')
+      ->fields('f', array('path', 'feedburner'))
+      ->execute();
+    foreach ($result as $feedburner_feed) {
+      $feedburner_feed = (array)$feedburner_feed;
       if ($category == 'all' || $category == 'feedburner' || $category == 'site') {
         $feeds[] = $feedburner_feed;
       }
@@ -873,7 +888,7 @@ function feedburner_autocomplete($category) {
     }
   }
 
-  drupal_json($feeds);
+  drupal_json_output($feeds);
 
   /* $feeds = _feedburner_get_feed_list($cat, array('match' => $key, 'feedburner' => FALSE));
   $feeds = array_slice($feeds, 0, 10);
