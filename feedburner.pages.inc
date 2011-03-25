@@ -75,8 +75,10 @@ function theme_feedburner_block_feeds() {
   module_load_include('inc', 'feedburner', 'feedburner.admin');
   $items = array();
 
-  $query = db_query("SELECT path, feedburner FROM {feedburner}");
-  while ($feed = db_fetch_object($query)) {
+  $result = db_select('feedburner', 'f')
+    ->fields('f', array('path', 'feedburner'))
+    ->execute();
+  foreach ($result as $feed) {
     $features = _feedburner_get_feed_features($feed->feedburner);
     $items[] = theme('image', 'misc/feed.png') . ' ' . l(($features->title ? $features->title : $feed->path), _feedburner_construct_url($feed->feedburner));
   }

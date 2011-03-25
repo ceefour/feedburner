@@ -183,7 +183,7 @@ function feedburner_burn_form_submit($form, &$form_state) {
 
 function feedburner_unburn_form() {
   $path = _feedburner_get_path_segment(4);
-  $feed = db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", $path));
+  $feed = db_select('feedburner', 'f')->fields('f', 'feedburner')->condition('path', $path)->execute()->fetch();
 
   if (empty($path) || $feed === FALSE) {
     drupal_goto('admin/build/feedburner');
@@ -424,21 +424,24 @@ function _feedburner_get_blog_feeds(&$feeds) {
   );
 
   // Get all user blog feeds for users with the blogging permission granted
-  $sql = "SELECT u.uid, u.name FROM {users} u LEFT JOIN {users_roles} ur USING (uid) WHERE u.uid = 1";
-  $args = array();
+  $query = db_select('users', 'u')
+    ->leftJoin('users_roles', 'ur', 'u.uid = ur.uid')
+    ->fields('u', array('uid', 'name'));
 
   $blog_roles = user_roles(TRUE, 'create blog entries');
-  // if (isset($blog_roles[DRUPAL_ANONYMOUS_RID])) {}
+
   if (isset($blog_roles[DRUPAL_AUTHENTICATED_RID])) {
-    $sql .= ' OR u.uid > 1';
+    $query->condition(db_or()->condition('u.uid', 1, '>')->condition('u.uid', 1));
   }
   elseif (count($blog_roles)) {
-    $sql .= ' OR ur.rid IN (' . db_placeholders($blog_roles) . ')';
-    $args = array_keys($blog_roles);
+    $query->condition(db_or()->condition('ur.rid', $blog_roles, 'IN')->condition('u.uid', 1));
+  }
+  else {
+    $query->condition('u.uid', 1);
   }
 
-  $query = db_query($sql, $args);
-  while ($account = db_fetch_object($query)) {
+  $result = $query->execute();
+  foreach ($result as $account) {
     $feeds[] = array(
       'path' => 'blog/' . $account->uid . '/feed',
       'description' => t("@username's blog", array('@username' => $account->name)),
@@ -450,7 +453,6 @@ function _feedburner_get_blog_feeds(&$feeds) {
  * Get a list of taxonomy feeds.
  */
 function _feedburner_get_taxonomy_feeds(&$feed) {
-  //$query = db_query('SELECT tid, name FROM {taxonomy_term_data}');
   $result = db_select('taxonomy_term_data', 'ttd')
     ->fields('ttd')
     ->execute();
@@ -484,8 +486,6 @@ function _feedburner_get_og_feeds(&$feeds) {
   //);
   _feedburner_get_views_feeds($feeds, 'og_');
 
-  // D6
-  // $query = db_query("SELECT n.nid, n.title FROM {og} og LEFT JOIN {node} n USING (nid)");
   $result = db_select('og', 'og')
     ->leftJoin('n', 'node', 'og.nid = n.nid')
     ->fields('n', array('nid', 'title'))
@@ -521,7 +521,6 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
   // Merge FeedBurner feed data into list
   // TODO: Fetch FeedBurner feeds from FeedManagement API
   if ($category == 'feedburner' || $options['feedburner']) {
-    $query = db_query("SELECT path, feedburner FROM {feedburner}");
     $result = db_select('feedburner', 'f')
       ->fields('f', array('path', 'feedburner'))
       ->execute();

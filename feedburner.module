@@ -143,8 +143,10 @@ function feedburner_url_outbound_alter(&$path, &$options, $original_path) {
 
     if (!isset($feeds)) {
       // Store a static list of all current FeedBurner feeds.
-      $query = db_query("SELECT path, feedburner FROM {feedburner}");
-      while ($feed = db_fetch_object($query)) {
+      $result = db_select('feedburner', 'f')
+        ->fields('f')
+        ->execute();
+      foreach ($result as $feed) {
         $feeds[$feed->path] = $feed->feedburner;
       }
     }
@@ -157,23 +159,10 @@ function feedburner_url_outbound_alter(&$path, &$options, $original_path) {
     if (!empty($feeds[$original_path])) {
       $path = $feeds[$original_path];
       $options['absolute'] = TRUE;
-      $options['base_url'] = 'http://' . feedburner_var('domain');
-      //$path = _feedburner_construct_url($feeds[$original_path]);
-      //$options['external'] = TRUE;
+      //$options['base_url'] = 'http://' . feedburner_var('domain');
+      $path = _feedburner_construct_url($feeds[$original_path]);
+      $options['external'] = TRUE;
     }
-  }
-}
-
-/**
- * Implements custom_url_rewrite_outbound().
- *
- * This function will only work if custom_url_rewrite_outbound is not already
- * defined, or the url_alter module is not enabled (might work for a majority
- * of sites).
- */
-if (!function_exists('custom_url_rewrite_outbound')) {
-  function custom_url_rewrite_outbound(&$path, &$options, $original_path) {
-    feedburner_url_outbound_alter($path, $options, $original_path);
   }
 }
 
@@ -274,8 +263,8 @@ function feedburner_user_delete(&$edit, &$account, $category = NULL) {
  * Implements hook_form_FORM_ID_alter().
  */
 function feedburner_form_user_profile_form_alter(&$form, $form_state) {
-  if ($form['_category']['#value'] == 'account') {
-    $account = $form['_account']['#value'];
+  if ($form['#user_category'] == 'account') {
+    $account = $form['#user'];
     if (user_access('create blog entries', $account) && user_access('add feedburner feed to own blog', $account)) {
       $user_blog_feed = "blog/{$account->uid}/feed";
       if (!isset($form['blog'])) {
@@ -295,7 +284,7 @@ function feedburner_form_user_profile_form_alter(&$form, $form_state) {
         '#title' => t('FeedBurner feed'),
         '#maxlength' => 100,
         '#size' => 25,
-        '#default_value' => db_result(db_query("SELECT feedburner FROM {feedburner} WHERE path = '%s'", array(':path' => $user_blog_feed))),
+        '#default_value' => db_select('feedburner', 'f')->fields('f', array('feedburner'))->condition('path', $user_blog_feed)->execute()->fetch(),
         '#field_prefix' => _feedburner_construct_url(),
         '#description' => t("Requests for <a href=\"@blog-feed\">your blog's feed</a> will be redirected to the FeedBurner feed specified above. Leave this blank to disable redirection for your blog's feed.", array('@blog-feed' => url($user_blog_feed, array('absolute' => TRUE)))),
         '#element_validate' => array('_feedburner_validate_feed'),
@@ -522,15 +511,12 @@ function feedburner_load($where, $args = array()) {
  *   An optional array of arguments.
  */
 function feedburner_delete($where, $args = array()) {
-  foreach ($where as $key => $value) {
-    if (is_string($value)) {
-      $args[] = $value;
-      $where[$key] = $key . ' = ' . (is_numeric($value) ? '%d' : "'%s'");
-    }
-  }
-
   if ($where && $args) {
-    return db_query("DELETE FROM {feedburner} WHERE " . implode(' AND ', $where), $args);
+    $query = db_delete('feedburner');
+    foreach ($where as $key => $value) {
+      $query->condition($key, $value);
+    }
+    return $query->execute();
   }
 }
 
@@ -542,33 +528,6 @@ function _feedburner_validate_feed($element, &$form_state) {
     form_set_error($element['#name'], t('Invalid FeedBurner feed name.'));
   }
 }
-
-/**
- * Perform URL replacement for feeds that have a FeedBurner feed in HTML code.
- *
- * @param $source
- *   A string containing HTML code.
- * @return
- *   TRUE if replacements were made and the HTML was changed, FALSE otherwise.
- */
-/* function _feedburner_replace_feed_html(&$source) {
-  $changed = FALSE;
-
-  $query = db_query("SELECT path, feedburner FROM {feedburner} ORDER BY path DESC");
-  while ($feed = db_fetch_object($query)) {
-    $internal_url = url($feed->path);
-    $external_url = url($feed->path, array('absolute' => TRUE));
-    $regex = '%(href=")'. preg_quote($internal_url, '/') .'(")|'. preg_quote($external_url, '/') .'%i';
-    $replace = '$1'. _feedburner_construct_url($feed->feedburner) .'$2';
-    $count = 0;
-    $source = preg_replace($regex, $replace, $source, -1, $count);
-    if ($count) {
-      $changed = TRUE;
-    }
-  }
-
-  return $changed;
-}*/
 
 /**
  * Constructs an absolute url based on a FeedBurner feed URI.
