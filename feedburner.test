@@ -79,8 +79,8 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
    */
   function testBlogFeedRedirection() {
     $blog_user = $this->drupalCreateUser(array('create blog entries', 'add FeedBurner feed to own blog'));
-    $blog_user_feed = 'blog/'. $blog_user->uid . '/feed';
-    $blog_user_edit = 'user/'. $blog_user->uid . '/edit';
+    $blog_user_feed = 'blog/' . $blog_user->uid . '/feed';
+    $blog_user_edit = 'user/' . $blog_user->uid . '/edit';
 
     $this->drupalLogin($blog_user);
 
@@ -110,7 +110,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
     // Test that a user without permission cannot access the form field.
     $no_blog_user = $this->drupalCreateUser(array('add FeedBurner feed to own blog'));
     $this->drupalLogin($no_blog_user);
-    $this->drupalGet('user/'. $no_blog_user->uid . '/edit');
+    $this->drupalGet('user/' . $no_blog_user->uid . '/edit');
     $this->assertNoFieldByName('feedburner_feedburner');
   }
 
@@ -120,7 +120,7 @@ class FeedBurnerTestCase extends DrupalWebTestCase {
   function testFeedHTMLReplacement() {
     $original_url = url('rss.xml');
     $feedburner_url = _feedburner_construct_url('example-feed');
-    
+
     // Enable a FeedBurner feed and check the proper original HTML is found.
     feedburner_save(array('path' => 'rss.xml', 'feedburner' => 'example-feed'));
     $this->drupalGet('');

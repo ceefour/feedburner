@@ -6,7 +6,7 @@
  */
 
 /**
- * Implementation of hook_install().
+ * Implements hook_install().
  */
 function feedburner_install() {
   drupal_install_schema('feedburner');
@@ -16,7 +16,7 @@ function feedburner_install() {
 }
 
 /**
- * Implementation of hook_uninstall().
+ * Implements hook_uninstall().
  */
 function feedburner_uninstall() {
   drupal_uninstall_schema('feedburner');
@@ -30,7 +30,7 @@ function feedburner_uninstall() {
 }
 
 /**
- * Implementation of hook_requirements().
+ * Implements hook_requirements().
  */
 function feedburner_requirements($phase) {
   $requirements = array();
@@ -49,7 +49,7 @@ function feedburner_requirements($phase) {
 }
 
 /**
- * Implementation of hook_schema().
+ * Implementshook_schema().
  */
 function feedburner_schema() {
   $schema['feedburner'] = array(
@@ -97,7 +97,7 @@ function feedburner_update_6000() {
   if (count($old_feeds)) {
     variable_del('feedburner_feeds');
     foreach ($old_feeds as $path => $feedburner) {
-      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES ('". $path ."', '". $feedburner ."')");
+      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES ('" . $path . "', '" . $feedburner . "')");
     }
   }
 
@@ -105,7 +105,7 @@ function feedburner_update_6000() {
   if (db_table_exists('feedburner_feeds')) {
     $old_feeds = db_query("SELECT local_uri, fb_uri FROM {feedburner_feeds}");
     while ($old_feed = db_fetch_object($old_feeds)) {
-      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES ('". $old_feed->local_uri ."', '". $old_feed->fb_uri ."')");
+      $ret[] = update_sql("INSERT INTO {feedburner} (path, feedburner) VALUES ('" . $old_feed->local_uri . "', '" . $old_feed->fb_uri . "')");
     }
     db_drop_table($ret, 'feedburner_feeds');
   }
@@ -113,7 +113,7 @@ function feedburner_update_6000() {
   // Convert old useragent variable to full regex expression
   $useragents = variable_get('feedburner_useragents', '/feedburner|feedvalidator/i');
   if (!preg_match('%^/.*/i$%', $useragents)) {
-    variable_set('feedburner_useragents', '/'. $useragents .'/i');
+    variable_set('feedburner_useragents', '/' . $useragents . '/i');
   }
 
   $ret[] = update_sql("UPDATE {system} SET weight = -1 WHERE type = 'module' AND name = 'feedburner'");

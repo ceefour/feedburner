@@ -1,6 +1,11 @@
 name = Feedburner
 description = "Integrates with FeedBurner services, primarily feed redirection."
-core = 6.x
-suggests[] = commentrss
-suggests[] = advanced_help
-recommends[] = pathologic
+core = 7.x
+
+dependencies[] = redirect
+
+files[] = feedburner.admin.inc
+files[] = feedburner.install
+files[] = feedburner.module
+files[] = feedburner.pages.inc
+files[] = feedburner.test

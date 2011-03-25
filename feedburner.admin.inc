@@ -25,13 +25,13 @@ function feedburner_build_overview($category) {
     $row[] = l($feed['alias'], $feed['alias'], array('alias' => TRUE, 'attributes' => array('alt' => $feed['description'], 'title' => $feed['description'])));
     if (isset($feed['feedburner'])) {
       $row[] = l($feed['feedburner'], _feedburner_construct_url($feed['feedburner']));
-      $row[] = l(t('Edit'), 'admin/build/feedburner/burn/'. $feed['path']);
-      $row[] = l(t('Unburn'), 'admin/build/feedburner/unburn/'. $feed['path']);
+      $row[] = l(t('Edit'), 'admin/build/feedburner/burn/' . $feed['path']);
+      $row[] = l(t('Unburn'), 'admin/build/feedburner/unburn/' . $feed['path']);
       $row[] = l(t('Source'), $feed['path'], array('query' => 'redirect=no'));
     }
     else {
       $row[] = '';
-      $row[] = l(t('Burn'), 'admin/build/feedburner/burn/'. $feed['path']);
+      $row[] = l(t('Burn'), 'admin/build/feedburner/burn/' . $feed['path']);
       $row[] = '';
       $row[] = '';
     }
@@ -104,14 +104,14 @@ function feedburner_build_filter_form(&$form_state, $category, $keys = '') {
  * Process filter form submission when the Filter button is pressed.
  */
 function feedburner_build_filter_form_submit_filter($form, &$form_state) {
-  $form_state['redirect'] = 'admin/build/feedburner/list/'. $form_state['values']['category'] .'/'. trim($form_state['values']['filter']);
+  $form_state['redirect'] = 'admin/build/feedburner/list/' . $form_state['values']['category'] . '/' . trim($form_state['values']['filter']);
 }
 
 /**
  * Process filter form submission when the Reset button is pressed.
  */
 function feedburner_build_filter_form_submit_reset($form, &$form_state) {
-  $form_state['redirect'] = 'admin/build/feedburner/list/'. $form_state['values']['category'];
+  $form_state['redirect'] = 'admin/build/feedburner/list/' . $form_state['values']['category'];
 }
 
 
@@ -230,11 +230,11 @@ function feedburner_settings_form() {
     '#type' => 'checkbox',
     '#title' => t('Replace all links to burned FeedBurner feeds in the source HTML.'),
     '#default_value' => feedburner_var('replace_html'),
-    '#description' => t('This option is currently experimental.') .' '. t('This option requires that <a href="@clean-url">Clean URLs</a> are enabled along with the <a href="@url-alter">Url alter module</a>.', array('@clean-url' => url('admin/settings/clean-urls'), '@url-alter' => 'http://drupal.org/project/url_alter')),
+    '#description' => t('This option is currently experimental.') . ' ' . t('This option requires that <a href="@clean-url">Clean URLs</a> are enabled along with the <a href="@url-alter">Url alter module</a>.', array('@clean-url' => url('admin/settings/clean-urls'), '@url-alter' => 'http://drupal.org/project/url_alter')),
     '#disabled' => !variable_get('clean_url', 0) || (url('feedburner/url-rewrite-test') && !defined('FEEDBURNER_CUSTOM_URL_REWRITE_OUTBOUND')),
   );
   //if (module_exists('advanced_help') && FALSE) {
-  //  $form['general']['feedburner_replace_html']['#description'] .= ' '. theme('advanced_help_topic', 'feedburner', 'settings-replace-links', t('[more help]'));
+  //  $form['general']['feedburner_replace_html']['#description'] .= ' ' . theme('advanced_help_topic', 'feedburner', 'settings-replace-links', t('[more help]'));
   //}
 
   $feeds = array(0 => 'None (disabled)') + _feedburner_get_feed_list('feedburner', array('key' => 'feedburner', 'fields' => 'feedburner'));
@@ -297,7 +297,7 @@ function feedburner_settings_form() {
   //);
   //$form['account']['verified'] = array(
   //  '#type' => 'markup',
-  //  '#value' => '<p><strong>'. t('Account status:') .'</strong><br /><span style="color: '. ($auth ? 'green">'. t('Verified') : 'red">'. t('NOT VERIFIED')) .'</span></p>',
+  //  '#value' => '<p><strong>' . t('Account status:') . '</strong><br /><span style="color: ' . ($auth ? 'green">' . t('Verified') : 'red">' . t('NOT VERIFIED')) . '</span></p>',
   //);
   //
   //if (!_feedburner_can_api()) {
@@ -324,7 +324,7 @@ function feedburner_settings_form() {
   $form['advanced']['feedburner_domain'] = array(
     '#type' => 'textfield',
     '#title' => t('MyBrand custom domain'),
-    '#description' => t('MyBrand is a premium FeedBurner service that allows you to showcase your feeds by serving them from your own domain (for example, @domain). You must have access to change your CNAME entry in the DNS records for the domain you wish to change. For more information, see <a href="@link">@link</a>.', array('@link' => 'http://feedburner.google.com/fb/a/mybrand', '@domain' => 'feeds.'. $_SERVER['SERVER_NAME'])),
+    '#description' => t('MyBrand is a premium FeedBurner service that allows you to showcase your feeds by serving them from your own domain (for example, @domain). You must have access to change your CNAME entry in the DNS records for the domain you wish to change. For more information, see <a href="@link">@link</a>.', array('@link' => 'http://feedburner.google.com/fb/a/mybrand', '@domain' => 'feeds.' . $_SERVER['SERVER_NAME'])),
     '#default_value' => feedburner_var('domain'),
     '#field_prefix' => 'http://',
     '#field_suffix' => '/feedname',
@@ -357,13 +357,13 @@ function feedburner_settings_form_validate($form, &$form_state) {
   if (empty($useragents) || !preg_match('/\w+/', $useragents)) {
     drupal_set_message(t('Please enter at least one user agent that will have access to your site\'s feeds. It is strongly recommended to allow both the "feedburner" and "feedvalidator" user agents.'), 'error');
   }
-  $useragents = '/'. preg_replace(array('/[\r\n]+/', '/\\\\\*/'), array('|', '.*'), $useragents) .'/i';
+  $useragents = '/' . preg_replace(array('/[\r\n]+/', '/\\\\\*/'), array('|', '.*'), $useragents) . '/i';
   $values['feedburner_useragents'] = $useragents;
 
   // feedburner_domain
   $feedburner_domain = $values['feedburner_domain'];
   if ($feedburner_domain != feedburner_var('domain')) {
-    $request = drupal_http_request('http://'. $feedburner_domain .'/');
+    $request = drupal_http_request('http://' . $feedburner_domain . '/');
     if (!isset($request->headers['X-FB-Host']) || !isset($request->code) || $request->code != 400 || !isset($request->error) || $request->error != 'You must provide a feed uri') {
       // TODO: Insert help link for CNAME MyBrand editing (http://feedburner.google.com/fb/a/publishers/mybrand)
       drupal_set_message(t('The MyBrand domain <a href="http://@domain/">@domain</a> failed verification. Make sure you have edited the domain\'s CNAME settings before enabling this option.', array('@domain' => $feedburner_domain)), 'error');
@@ -375,11 +375,11 @@ function feedburner_settings_form_validate($form, &$form_state) {
  * Get a list of site feeds.
  */
 function _feedburner_get_site_feeds(&$feeds) {
-  $feeds[] = array('path' => 'rss.xml', 'description' => variable_get('site_name', 'Drupal') .' frontpage feed');
+  $feeds[] = array('path' => 'rss.xml', 'description' => variable_get('site_name', 'Drupal') . ' frontpage feed');
   $feeds[] = array('path' => 'aggregator/feed', 'description' => 'Aggregator feed', 'module' => 'aggregator');
-  $feeds[] = array('path' => 'blog/feed', 'description' => variable_get('site_name', 'Drupal') .' blogs', 'module' => 'blog');
-  $feeds[] = array('path' => 'crss', 'description' => variable_get('site_name', 'Drupal') .' comments', 'module' => 'commentrss');
-  $feeds[] = array('path' => 'atom/feed', 'description' => variable_get('site_name', 'Drupal') .' ATOM', 'module' => 'atom');
+  $feeds[] = array('path' => 'blog/feed', 'description' => variable_get('site_name', 'Drupal') . ' blogs', 'module' => 'blog');
+  $feeds[] = array('path' => 'crss', 'description' => variable_get('site_name', 'Drupal') . ' comments', 'module' => 'commentrss');
+  $feeds[] = array('path' => 'atom/feed', 'description' => variable_get('site_name', 'Drupal') . ' ATOM', 'module' => 'atom');
 }
 
 /**
@@ -412,7 +412,7 @@ function _feedburner_get_views_feeds(&$feeds, $key = NULL) {
 function _feedburner_get_blog_feeds(&$feeds) {
   $feeds[] = array(
     'path' => 'blog/feed',
-    'description' => variable_get('site_name', 'Drupal') .' blogs',
+    'description' => variable_get('site_name', 'Drupal') . ' blogs',
   );
 
   // Get all user blog feeds for users with the blogging permission granted
@@ -425,14 +425,14 @@ function _feedburner_get_blog_feeds(&$feeds) {
     $sql .= ' OR u.uid > 1';
   }
   elseif (count($blog_roles)) {
-    $sql .= ' OR ur.rid IN ('. db_placeholders($blog_roles) .')';
+    $sql .= ' OR ur.rid IN (' . db_placeholders($blog_roles) . ')';
     $args = array_keys($blog_roles);
   }
 
   $query = db_query($sql, $args);
   while ($account = db_fetch_object($query)) {
     $feeds[] = array(
-      'path' => 'blog/'. $account->uid .'/feed',
+      'path' => 'blog/' . $account->uid . '/feed',
       'description' => t("@username's blog", array('@username' => $account->name)),
     );
   }
@@ -445,7 +445,7 @@ function _feedburner_get_taxonomy_feeds(&$feed) {
   $query = db_query('SELECT tid, name FROM {term_data}');
   while ($term = db_fetch_object($query)) {
     $feeds[] = array(
-      'path' => 'taxonomy/term/'. $term->tid .'/0/feed',
+      'path' => 'taxonomy/term/' . $term->tid . '/0/feed',
       'description' => $term->name,
     );
   }
@@ -472,10 +472,16 @@ function _feedburner_get_og_feeds(&$feeds) {
   //  'description' => t('Recent posts in my groups'),
   //);
   _feedburner_get_views_feeds($feeds, 'og_');
-  $query = db_query("SELECT n.nid, n.title FROM {og} og LEFT JOIN {node} n USING (nid)");
-  while ($group = db_fetch_object($query)) {
+
+  // D6
+  // $query = db_query("SELECT n.nid, n.title FROM {og} og LEFT JOIN {node} n USING (nid)");
+  $result = db_select('og', 'og')
+    ->leftJoin('n', 'node', 'og.nid = n.nid'),
+    ->fields('n', array('nid', 'title')),
+    ->execute();
+  foreach ($result as $group) {
     $feeds[] = array(
-      'path' => 'node/'. $group->nid .'/feed',
+      'path' => 'node/' . $group->nid . '/feed',
       'description' => $group->title,
     );
   }
@@ -495,7 +501,7 @@ function _feedburner_get_feed_list($category = 'site', $options = array()) {
 
   $categories = _feedburner_get_feed_categories();
   foreach ($categories as $category_key => $category_options) {
-    $function = '_feedburner_get_'. $category_key .'_feeds';
+    $function = '_feedburner_get_' . $category_key . '_feeds';
     if (($category == $category_key || $category == 'all') && $category_options['access'] && function_exists($function)) {
       $function($feeds);
     }
@@ -575,7 +581,7 @@ function _feedburner_process_feed_list($feeds, $options = array()) {
 
     // Match regular expressions
     if (!empty($options['match']) && is_string($options['match'])) {
-      $regex = '/'. preg_quote($options['match'], '/') .'/i';
+      $regex = '/' . preg_quote($options['match'], '/') . '/i';
       $fields = array_keys($feed);
       $feed['value'] = FALSE;
       foreach ($fields as $field) {
@@ -707,21 +713,21 @@ function _feedburner_request_api($function, $args = array()) {
   }
 
   $request->function = $functions[$function];
-  $request->url = 'http://api.feedburner.com/'. $request->function['api'] .'/1.0/'. $function;
+  $request->url = 'http://api.feedburner.com/' . $request->function['api'] . '/1.0/' . $function;
   $request->method = isset($request->function['method']) ? $request->function['method'] : 'GET';
   $request->headers = array();
   $request->data = NULL;
 
   if ($request->function['api'] == 'management') {
     if (!isset($args['user']) && $auth = feedburner_var('auth')) {
-      $request->headers['Authorization'] = 'Basic '. $auth;
+      $request->headers['Authorization'] = 'Basic ' . $auth;
       unset($args['user']);
       unset($args['password']);
     }
-    //$request->url = 'http://api.feedburner.com/management/1.0/'. $function;
+    //$request->url = 'http://api.feedburner.com/management/1.0/' . $function;
   }
   elseif ($request->function['api'] == 'awareness') {
-    //$request->url = 'http://api.feedburner.com/awareness/1.0/'. $function;
+    //$request->url = 'http://api.feedburner.com/awareness/1.0/' . $function;
   }
 
   // Use secure request if PHP OpenSSL is available on any request
@@ -734,7 +740,7 @@ function _feedburner_request_api($function, $args = array()) {
     $request->data = drupal_query_string_encode($args);
   }
   elseif ($request->method == 'GET') {
-    $request->url .= '?'. drupal_query_string_encode($args);
+    $request->url .= '?' . drupal_query_string_encode($args);
   }
 
   $response = drupal_http_request($request->url, $request->headers, $request->method, $request->data);
@@ -786,7 +792,7 @@ function _feedburner_get_feed_features($uri, $cache = FALSE) {
   $feed->verified = FALSE;
 
   // Scrape details from the actual feed
-  $request = drupal_http_request(_feedburner_construct_url($uri) .'?format=xml');
+  $request = drupal_http_request(_feedburner_construct_url($uri) . '?format=xml');
 
   if (isset($request->error)) {
     $feed->error = $request->error;
@@ -855,13 +861,13 @@ function feedburner_autocomplete($category) {
     foreach ($feeds as $key => $feed) {
       $description = '';
       if ($feed['alias'] != $feed['path']) {
-        $description .= $feed['alias'] .' ('. $feed['path'] .')';
+        $description .= $feed['alias'] . ' (' . $feed['path'] . ')';
       }
       else {
         $description .= $feed['path'];
       }
       if (isset($feed['description'])) {
-        $description .= ' - '. $feed['description'];
+        $description .= ' - ' . $feed['description'];
       }
       $feeds[$key] = $description;
     }
@@ -877,7 +883,7 @@ function feedburner_autocomplete($category) {
       $keepers[$feed['feedburner']] = $feed['feedburner'];
     }
     else {
-      $keepers[$feed['path']] = ($feed['alias'] != $feed['path'] ? $feed['alias'] .' ('. $feed['path'] .')' : $feed['path']) . ($feed['description'] ? ' - '. $feed['description'] : '');
+      $keepers[$feed['path']] = ($feed['alias'] != $feed['path'] ? $feed['alias'] . ' (' . $feed['path'] . ')' : $feed['path']) . ($feed['description'] ? ' - ' . $feed['description'] : '');
     }
   }
 
