@@ -234,7 +234,7 @@ function feedburner_ping($name = '', $url = '') {
   variable_set('feedburner_ping_last', $_SERVER['REQUEST_TIME']);
   // If the last ping was less than 10 minutes ago, do not ping again.
   //if ($_SERVER['REQUEST_TIME'] - feedburner_var('ping_last') < 600) {
-  $result = xmlrpc('http://ping.feedburner.google.com/', 'weblogUpdates.ping', $name, $url);
+  $result = xmlrpc('http://ping.feedburner.google.com/', 'weblogUpdates.ping', array($name, $url));
   if ($result === FALSE) {
     watchdog('feedburner', 'Failed to ping FeedBurner.', array(), WATCHDOG_WARNING);
   }
