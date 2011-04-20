@@ -207,8 +207,8 @@ function feedburner_unburn_form($form, &$form_state) {
 }
 
 function feedburner_unburn_form_submit($form, &$form_state) {
-  if ($form_state['values']['confirm']) {
-    if ($form_state['values']['unburn']) {
+  if (!empty($form_state['values']['confirm'])) {
+    if (!empty($form_state['values']['unburn'])) {
       // TODO: Implement Management API DeleteFeed
     }
     feedburner_delete(array('path' => $form_state['values']['path']));
