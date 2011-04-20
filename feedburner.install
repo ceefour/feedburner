@@ -9,8 +9,6 @@
  * Implements hook_install().
  */
 function feedburner_install() {
-  drupal_install_schema('feedburner');
-
   // Set module weight to run before others.
   db_query("UPDATE {system} SET weight = -1 WHERE type = 'module' AND name = 'feedburner'");
 }
