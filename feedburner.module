@@ -171,7 +171,7 @@ function feedburner_url_outbound_alter(&$path, &$options, $original_path) {
  *
  * Inserts FeedFlare into nodes.
  */
-function feedburner_node_view(&$node, $view_mode = 'full', $langcode = NULL) {
+function feedburner_node_view($node, $view_mode = 'full', $langcode = NULL) {
   if ($view_mode == 'teaser') {
     $teaser = TRUE;
   }
