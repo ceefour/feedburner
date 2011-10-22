@@ -1,0 +1,4 @@
+server.host=localhost
+server.user=ceefour
+server.dir=public_html/drupal
+server.port=22

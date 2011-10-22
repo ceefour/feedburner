@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="feedburner">
+	<property file="module.properties"/>
+	<property file="deploy.properties"/>
+	<property file="development.properties"/>
+		
+	<fail unless="module.name"/>
+	<fail unless="module.dirname"/>
+
+	<target name="cache.clear" description="Clear cache on remote Drupal instance.">
+		<fail unless="server.host"/>
+		<fail unless="server.port"/>
+		<fail unless="server.user"/>
+		<fail unless="server.dir"/>
+		<sshexec host="${server.host}" username="${server.user}" port="${server.port}"
+			keyfile="${user.home}/.ssh/id_rsa" trust="true"
+			command="drush --root='${server.dir}' cache-clear all"/>
+	</target>
+
+    <target name="deploy"
+		description="Deploy ${module.name} files via rsync to ${server.user}@${server.host}:${server.dir} at port ${server.port}. Then clear cache.">
+    	<fail unless="server.user"/>
+    	<fail unless="server.host"/>
+    	<fail unless="server.port"/>
+    	<fail unless="server.dir"/>
+		<exec executable="rsync">
+			<arg value="-e"/>
+			<arg value="ssh -p${server.port}"/>
+			<arg value="-vza"/>
+			<arg value="--delete"/>
+			<arg value="--exclude"/><arg value="**/.dummy"/>
+			<arg value="--exclude"/><arg value=".git"/>
+			<arg value="--exclude"/><arg value=".gitignore"/>			
+			<arg value="--exclude"/><arg value=".project"/>
+			<arg value="--exclude"/><arg value=".settings"/>			
+			<arg value="--exclude"/><arg value=".buildpath"/>			
+			<arg value="--exclude"/><arg value="module.properties"/>
+			<arg value="--exclude"/><arg value="deploy.properties*"/>
+			<arg value="--exclude"/><arg value="development.properties*"/>
+			<arg value="--exclude"/><arg value="build.xml"/>			
+			<arg value="."/>
+			<arg value="${server.user}@${server.host}:${server.dir}/sites/all/modules/${module.dirname}" />
+		</exec>
+    	<antcall target="cache.clear" />
+    </target>
+
+</project>
