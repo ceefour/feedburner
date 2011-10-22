@@ -14,7 +14,7 @@
 		<fail unless="server.dir"/>
 		<sshexec host="${server.host}" username="${server.user}" port="${server.port}"
 			keyfile="${user.home}/.ssh/id_rsa" trust="true"
-			command="drush --root='${server.dir}' cache-clear all"/>
+			command="cd '${server.dir}' &amp;&amp; drush cache-clear all"/>
 	</target>
 
     <target name="deploy"
