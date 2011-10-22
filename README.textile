@@ -68,8 +68,9 @@ h2. Known Issues
   FCKeditor module and make sure to go to admin/settings/feedburner and set the
   value of the 'Allowed Useragents' field to the following (one on each line):
 
-    feedburner
-    feedvalidator
+bc. 
+feedburner
+feedvalidator
 
 
 h2. More Information
