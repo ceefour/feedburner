@@ -623,7 +623,7 @@ function feedburner_variables() {
     'feedburner_feedflare_node_types' => array(),
     'feedburner_feedflare_display' => array('page'),
     'feedburner_auth' => FALSE,
-    'feedburner_domain' => 'feedproxy.google.com',
+    'feedburner_domain' => 'feeds.feedburner.com',
     'feedburner_useragents' => '/feedburner|feedvalidator/i',
     'feedburner_block_feedcount_feed' => 0,
     'feedburner_block_email_feed' => 0,
